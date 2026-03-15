@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Network Monitor - Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+    <div class="sidebar-logo">
+        <i class="fas fa-network-wired"></i>
+        <span>NetMonitor</span>
+    </div>
+    <ul class="sidebar-menu">
+        <li class="active"><a th:href="@{/}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+        <li><a th:href="@{/hosts}"><i class="fas fa-server"></i> Hosts</a></li>
+        <li><a th:href="@{/alerts}"><i class="fas fa-bell"></i> Alertas
+            <span class="badge" th:if="${activeAlerts > 0}" th:text="${activeAlerts}"></span>
+        </a></li>
+        <li><a th:href="@{/bandwidth}"><i class="fas fa-chart-area"></i> Ancho de Banda</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <span id="clock"></span>
+    </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="main-content">
+    <header class="page-header">
+        <h1><i class="fas fa-tachometer-alt"></i> Dashboard de Monitoreo</h1>
+        <div class="header-actions">
+            <span class="live-badge"><i class="fas fa-circle pulse"></i> EN VIVO</span>
+            <button onclick="refreshAll()" class="btn btn-outline">
+                <i class="fas fa-sync-alt"></i> Actualizar
+            </button>
+        </div>
+    </header>
+
+    <!-- TARJETAS DE RESUMEN -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-server"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Total Hosts</span>
+                <span class="stat-value" id="totalHosts" th:text="${totalHosts}">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">En Línea</span>
+                <span class="stat-value green-text" id="onlineHosts" th:text="${onlineHosts}">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon red"><i class="fas fa-times-circle"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Fuera de Línea</span>
+                <span class="stat-value red-text" id="offlineHosts" th:text="${offlineHosts}">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Alertas Activas</span>
+                <span class="stat-value orange-text" id="activeAlertCount" th:text="${activeAlerts}">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="content-grid">
+
+        <!-- TABLA DE HOSTS -->
+        <section class="card hosts-table-card">
+            <div class="card-header">
+                <h2><i class="fas fa-server"></i> Estado de Hosts</h2>
+                <a th:href="@{/hosts}" class="btn btn-sm">Ver todos</a>
+            </div>
+            <div class="card-body">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Estado</th>
+                            <th>Nombre</th>
+                            <th>IP</th>
+                            <th>Tipo</th>
+                            <th>Latencia</th>
+                            <th>Última vez visto</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="hostsTableBody">
+                        <tr th:each="host : ${hosts}">
+                            <td>
+                                <span class="status-dot"
+                                      th:classappend="${host.status.name() == 'ONLINE'} ? 'online' :
+                                                       (${host.status.name() == 'OFFLINE'} ? 'offline' :
+                                                       (${host.status.name() == 'DEGRADED'} ? 'degraded' : 'unknown'))">
+                                </span>
+                                <span class="status-text"
+                                      th:text="${host.status.name() == 'ONLINE'} ? 'En línea' :
+                                               (${host.status.name() == 'OFFLINE'} ? 'Caído' :
+                                               (${host.status.name() == 'DEGRADED'} ? 'Degradado' : 'Desconocido'))">
+                                </span>
+                            </td>
+                            <td th:text="${host.name}">-</td>
+                            <td><code th:text="${host.ipAddress}">-</code></td>
+                            <td>
+                                <span class="tag" th:text="${host.type ?: 'N/A'}">-</span>
+                            </td>
+                            <td>
+                                <span th:if="${host.lastLatency != null}"
+                                      th:classappend="${host.lastLatency > 200} ? 'latency-high' : 'latency-ok'"
+                                      th:text="${#numbers.formatDecimal(host.lastLatency, 1, 1)} + ' ms'">
+                                </span>
+                                <span th:unless="${host.lastLatency != null}" class="text-muted">-</span>
+                            </td>
+                            <td>
+                                <span th:if="${host.lastSeen != null}"
+                                      th:text="${#temporals.format(host.lastSeen, 'dd/MM HH:mm')}">-</span>
+                                <span th:unless="${host.lastSeen != null}" class="text-muted">Nunca</span>
+                            </td>
+                            <td>
+                                <a th:href="@{/hosts/{id}(id=${host.id})}" class="btn btn-xs">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <form th:action="@{/hosts/{id}/ping(id=${host.id})}" method="post" style="display:inline">
+                                    <button type="submit" class="btn btn-xs btn-outline">
+                                        <i class="fas fa-satellite-dish"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(hosts)}">
+                            <td colspan="7" class="text-center text-muted">
+                                No hay hosts configurados. <a th:href="@{/hosts}">Agregar hosts</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- GRAFICO DE LATENCIA + ALERTAS -->
+        <div class="side-cards">
+
+            <!-- Grafico Disponibilidad -->
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-chart-pie"></i> Disponibilidad</h2>
+                </div>
+                <div class="card-body chart-container">
+                    <canvas id="availabilityChart"></canvas>
+                </div>
+            </section>
+
+            <!-- Alertas recientes -->
+            <section class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-bell"></i> Alertas Recientes</h2>
+                    <a th:href="@{/alerts}" class="btn btn-sm">Ver todas</a>
+                </div>
+                <div class="card-body alerts-list" id="alertsList">
+                    <div th:each="alert : ${recentAlerts}" class="alert-item"
+                         th:classappend="${alert.severity.name() == 'CRITICAL'} ? 'critical' :
+                                         (${alert.severity.name() == 'WARNING'} ? 'warning' : 'info')">
+                        <div class="alert-icon">
+                            <i class="fas fa-exclamation-circle" th:if="${alert.severity.name() == 'CRITICAL'}"></i>
+                            <i class="fas fa-exclamation-triangle" th:if="${alert.severity.name() == 'WARNING'}"></i>
+                            <i class="fas fa-info-circle" th:if="${alert.severity.name() == 'INFO'}"></i>
+                        </div>
+                        <div class="alert-content">
+                            <strong th:text="${alert.title}">-</strong>
+                            <small th:text="${#temporals.format(alert.createdAt, 'dd/MM HH:mm')}">-</small>
+                        </div>
+                    </div>
+                    <p th:if="${#lists.isEmpty(recentAlerts)}" class="text-muted text-center">
+                        <i class="fas fa-check-circle green-text"></i> Sin alertas recientes
+                    </p>
+                </div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- GRAFICO DE LATENCIA HISTORICA -->
+    <section class="card mt-20">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-line"></i> Latencia en Tiempo Real</h2>
+            <select id="hostSelector" class="select-input" onchange="loadLatencyChart()">
+                <option value="">-- Seleccionar Host --</option>
+                <option th:each="host : ${hosts}"
+                        th:value="${host.id}"
+                        th:text="${host.name + ' (' + host.ipAddress + ')'}">
+                </option>
+            </select>
+        </div>
+        <div class="card-body chart-container-wide">
+            <canvas id="latencyChart"></canvas>
+        </div>
+    </section>
+
+</main>
+
+<!-- TOAST DE ALERTAS -->
+<div id="alertToast" class="toast hidden">
+    <i class="fas fa-bell"></i>
+    <span id="toastMessage">Nueva alerta</span>
+    <button onclick="closeToast()"><i class="fas fa-times"></i></button>
+</div>
+
+<script th:src="@{/js/dashboard.js}"></script>
+<script>
+    // Inicializar gráfico de disponibilidad
+    const ctx = document.getElementById('availabilityChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['En Línea', 'Caídos', 'Desconocido'],
+            datasets: [{
+                data: [/*[[${onlineHosts}]]*/ 0, /*[[${offlineHosts}]]*/ 0,
+                       /*[[${totalHosts - onlineHosts - offlineHosts}]]*/ 0],
+                backgroundColor: ['#22c55e', '#ef4444', '#94a3b8'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            cutout: '70%',
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+</script>
+</body>
+</html>

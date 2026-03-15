@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Alertas - Network Monitor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<nav class="sidebar">
+    <div class="sidebar-logo"><i class="fas fa-network-wired"></i><span>NetMonitor</span></div>
+    <ul class="sidebar-menu">
+        <li><a th:href="@{/}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+        <li><a th:href="@{/hosts}"><i class="fas fa-server"></i> Hosts</a></li>
+        <li class="active"><a th:href="@{/alerts}"><i class="fas fa-bell"></i> Alertas</a></li>
+        <li><a th:href="@{/bandwidth}"><i class="fas fa-chart-area"></i> Ancho de Banda</a></li>
+    </ul>
+</nav>
+<main class="main-content">
+    <header class="page-header">
+        <h1><i class="fas fa-bell"></i> Centro de Alertas</h1>
+        <div class="header-actions">
+            <span class="stat-chip critical" th:text="'Críticas: ' + ${#lists.size(activeAlerts.?[severity.name() == 'CRITICAL'])}">Críticas: 0</span>
+            <span class="stat-chip warning" th:text="'Activas: ' + ${#lists.size(activeAlerts)}">Activas: 0</span>
+        </div>
+    </header>
+
+    <section class="card">
+        <div class="card-header">
+            <h2>Todas las Alertas</h2>
+            <div class="filter-group">
+                <button onclick="filterAlerts('all')" class="btn btn-sm active" id="filterAll">Todas</button>
+                <button onclick="filterAlerts('CRITICAL')" class="btn btn-sm btn-danger">Críticas</button>
+                <button onclick="filterAlerts('WARNING')" class="btn btn-sm btn-warning">Avisos</button>
+                <button onclick="filterAlerts('INFO')" class="btn btn-sm btn-outline">Info</button>
+            </div>
+        </div>
+        <div class="card-body">
+            <table class="data-table" id="alertsTable">
+                <thead>
+                    <tr>
+                        <th>Severidad</th><th>Tipo</th><th>Host</th>
+                        <th>Mensaje</th><th>Estado</th><th>Fecha</th><th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="alert : ${allAlerts}" th:attr="data-severity=${alert.severity.name()}">
+                        <td>
+                            <span class="severity-badge"
+                                  th:classappend="${alert.severity.name() == 'CRITICAL'} ? 'critical' :
+                                                   (${alert.severity.name() == 'WARNING'} ? 'warning' : 'info')"
+                                  th:text="${alert.severity.name() == 'CRITICAL'} ? '🔴 CRÍTICO' :
+                                           (${alert.severity.name() == 'WARNING'} ? '🟡 AVISO' : '🔵 INFO')">
+                            </span>
+                        </td>
+                        <td><span class="tag" th:text="${alert.alertType}">-</span></td>
+                        <td>
+                            <span th:if="${alert.host != null}">
+                                <a th:href="@{/hosts/{id}(id=${alert.host.id})}"
+                                   th:text="${alert.host.name}">-</a>
+                            </span>
+                            <span th:unless="${alert.host != null}" class="text-muted">Sistema</span>
+                        </td>
+                        <td class="msg-cell" th:text="${alert.message}">-</td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="${alert.status.name() == 'ACTIVE'} ? 'red' :
+                                                   (${alert.status.name() == 'ACKNOWLEDGED'} ? 'orange' : 'green')"
+                                  th:text="${alert.status.name() == 'ACTIVE'} ? 'Activa' :
+                                           (${alert.status.name() == 'ACKNOWLEDGED'} ? 'Reconocida' : 'Resuelta')">
+                            </span>
+                        </td>
+                        <td th:text="${#temporals.format(alert.createdAt, 'dd/MM/yy HH:mm')}">-</td>
+                        <td class="actions-cell">
+                            <form th:if="${alert.status.name() == 'ACTIVE'}"
+                                  th:action="@{/alerts/{id}/acknowledge(id=${alert.id})}"
+                                  method="post" style="display:inline">
+                                <button class="btn btn-xs btn-outline" title="Reconocer">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </form>
+                            <form th:if="${alert.status.name() != 'RESOLVED'}"
+                                  th:action="@{/alerts/{id}/resolve(id=${alert.id})}"
+                                  method="post" style="display:inline">
+                                <button class="btn btn-xs btn-outline" title="Resolver">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(allAlerts)}">
+                        <td colspan="7" class="text-center text-muted">
+                            <i class="fas fa-check-circle" style="color:#22c55e"></i>
+                            No hay alertas registradas
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+<script th:src="@{/js/dashboard.js}"></script>
+<script>
+function filterAlerts(severity) {
+    document.querySelectorAll('#alertsTable tbody tr').forEach(row => {
+        if (severity === 'all') {
+            row.style.display = '';
+        } else {
+            row.style.display = row.dataset.severity === severity ? '' : 'none';
+        }
+    });
+}
+</script>
+</body>
+</html>
