@@ -27,7 +27,22 @@
         <li><a th:href="@{/bandwidth}"><i class="fas fa-chart-area"></i> Ancho de Banda</a></li>
     </ul>
     <div class="sidebar-footer">
-        <span id="clock"></span>
+        <div class="user-info">
+            <div class="user-avatar">
+                <i class="fas fa-user-circle"></i>
+            </div>
+            <div class="user-details">
+                <span class="user-name" sec:authentication="name">Usuario</span>
+            </div>
+        </div>
+        <form th:action="@{/logout}" method="post" style="margin-top:10px">
+            <button type="submit" class="btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Cerrar Sesion
+            </button>
+        </form>
+        <div style="margin-top:8px">
+            <span id="clock" style="font-size:0.75rem;color:var(--text-muted)"></span>
+        </div>
     </div>
 </nav>
 
