@@ -97,6 +97,13 @@
             <artifactId>thymeleaf-extras-springsecurity6</artifactId>
         </dependency>
         
+        <!-- OSHI: lectura de métricas del SO en Windows, Linux y Mac -->
+<dependency>
+    <groupId>com.github.oshi</groupId>
+    <artifactId>oshi-core</artifactId>
+    <version>6.4.10</version>
+</dependency>
+
     </dependencies>
 
     <build>

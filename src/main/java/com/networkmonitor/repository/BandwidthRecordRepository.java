@@ -23,8 +23,19 @@ public interface BandwidthRecordRepository extends JpaRepository<BandwidthRecord
     @Query("SELECT DISTINCT b.interfaceName FROM BandwidthRecord b")
     List<String> findDistinctInterfaces();
 
-    @Query("SELECT b FROM BandwidthRecord b WHERE b.interfaceName = :name ORDER BY b.recordedAt DESC LIMIT 1")
-    BandwidthRecord findLatestByInterface(@Param("name") String interfaceName);
+    /**
+     * NOTA: LIMIT 1 no funciona en SQL Server. Se usa findTop1 en su lugar.
+     */
+    BandwidthRecord findTop1ByInterfaceNameOrderByRecordedAtDesc(String interfaceName);
 
     void deleteByRecordedAtBefore(LocalDateTime before);
+
+    /**
+     * Todos los registros de los últimos N minutos, ordenados por fecha DESC.
+     * Compatible con SQL Server. El servicio agrupa por interfaz en Java.
+     */
+    @Query("SELECT b FROM BandwidthRecord b " +
+           "WHERE b.recordedAt > :since " +
+           "ORDER BY b.recordedAt DESC")
+    List<BandwidthRecord> findRecentRecords(@Param("since") LocalDateTime since);
 }

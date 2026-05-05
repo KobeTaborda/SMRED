@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Configuración de Alertas - Network Monitor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+    <style>
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .config-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 18px;
+            transition: border-color .2s;
+            position: relative;
+        }
+        .config-card:hover { border-color: var(--primary); }
+        .config-card.disabled-card { opacity: .55; }
+        .config-key {
+            font-family: monospace;
+            font-size: .82rem;
+            color: var(--primary);
+            word-break: break-all;
+            margin: 0 0 5px;
+            font-weight: 600;
+        }
+        .config-desc {
+            font-size: .81rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+            margin: 0 0 12px;
+        }
+        .config-row {
+            display: flex;
+            gap: 7px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .config-row input[type="text"] {
+            flex: 1;
+            min-width: 80px;
+            padding: .38rem .65rem;
+            border-radius: 6px;
+            background: var(--bg-input, #14141f);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: .87rem;
+            outline: none;
+        }
+        .config-row input[type="text"]:focus { border-color: var(--primary); }
+        .btn-save {
+            padding: .38rem .95rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            background: var(--primary);
+            color: #fff;
+            font-size: .82rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .btn-toggle {
+            padding: .35rem .85rem;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: .79rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .toggle-on  { background: rgba(34,197,94,.15);  color: var(--green);  border: 1px solid var(--green); }
+        .toggle-off { background: rgba(239,68,68,.15);  color: var(--red);    border: 1px solid var(--red); }
+        .btn-delete {
+            position: absolute;
+            top: 10px; right: 10px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: .8rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .btn-delete:hover { color: var(--red); background: rgba(239,68,68,.1); }
+        .save-ok { color: var(--green); font-size: .77rem; display: none; white-space: nowrap; }
+        .section-label {
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: var(--text-muted);
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+            margin: 0 0 12px;
+        }
+        .section-block { margin-bottom: 28px; }
+
+        /* Modal */
+        .modal-bg {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-bg.open { display: flex; }
+        .modal-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            width: 100%;
+            max-width: 480px;
+        }
+        .modal-box h3 {
+            margin: 0 0 18px;
+            font-size: 1rem;
+            color: var(--text);
+        }
+        .form-field { margin-bottom: 14px; }
+        .form-field label {
+            display: block;
+            font-size: .78rem;
+            color: var(--text-muted);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+        .form-field input,
+        .form-field select,
+        .form-field textarea {
+            width: 100%;
+            padding: .45rem .7rem;
+            border-radius: 6px;
+            background: var(--bg-input, #14141f);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: .88rem;
+            box-sizing: border-box;
+        }
+        .form-field textarea { resize: vertical; min-height: 80px; }
+        .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+        .btn-cancel {
+            padding: .42rem 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: .85rem;
+        }
+        .btn-primary {
+            padding: .42rem 1.2rem;
+            border-radius: 6px;
+            border: none;
+            background: var(--primary);
+            color: #fff;
+            cursor: pointer;
+            font-size: .85rem;
+            font-weight: 600;
+        }
+
+        /* Historial */
+        .history-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+        .history-table th {
+            text-align: left;
+            padding: 8px 12px;
+            color: var(--text-muted);
+            font-size: .75rem;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+        }
+        .history-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(255,255,255,.04);
+            color: var(--text);
+            vertical-align: top;
+        }
+        .history-table tr:hover td { background: rgba(255,255,255,.02); }
+        .tag-key {
+            font-family: monospace;
+            font-size: .78rem;
+            color: var(--primary);
+            background: rgba(99,102,241,.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .val-old { color: var(--red);   text-decoration: line-through; font-size:.78rem; }
+        .val-new { color: var(--green); font-size:.78rem; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+        .tab-btn {
+            padding: 8px 18px;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: .88rem;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        @media (max-width: 620px) { .config-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<nav class="sidebar">
+    <div class="sidebar-logo">
+        <i class="fas fa-network-wired"></i><span>NetMonitor</span>
+    </div>
+    <ul class="sidebar-menu">
+        <li><a th:href="@{/}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+        <li><a th:href="@{/hosts}"><i class="fas fa-server"></i> Hosts</a></li>
+        <li><a th:href="@{/alerts}"><i class="fas fa-bell"></i> Alertas</a></li>
+        <li><a th:href="@{/bandwidth}"><i class="fas fa-chart-area"></i> Ancho de Banda</a></li>
+        <li><a th:href="@{/http-monitors}"><i class="fas fa-globe"></i> Monitor HTTP</a></li>
+        <li><a th:href="@{/topology}"><i class="fas fa-project-diagram"></i> Topología</a></li>
+        <li><a th:href="@{/admin/users}"><i class="fas fa-users-cog"></i> Usuarios</a></li>
+        <li class="active"><a th:href="@{/alert-config}"><i class="fas fa-sliders-h"></i> Config. Alertas</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar"><i class="fas fa-user-circle"></i></div>
+            <div class="user-details">
+                <span class="user-name"
+                      th:text="${#authentication != null ? #authentication.name : 'Usuario'}">Usuario</span>
+            </div>
+        </div>
+        <form th:action="@{/logout}" method="post" style="margin-top:10px">
+            <button type="submit" class="btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Cerrar Sesion
+            </button>
+        </form>
+    </div>
+</nav>
+
+<main class="main-content">
+
+    <header class="page-header">
+        <h1><i class="fas fa-sliders-h"></i> Configuración de Alertas</h1>
+        <div class="header-actions">
+            <button class="btn btn-sm btn-outline" id="btnNuevaConfig" style="margin-right:8px">
+                <i class="fas fa-plus"></i> Nueva Config
+            </button>
+            <button class="btn btn-sm" id="btnNuevaAlerta"
+                    style="background:rgba(239,68,68,.15);color:var(--red);border:1px solid var(--red)">
+                <i class="fas fa-bell"></i> Crear Alerta Manual
+            </button>
+        </div>
+    </header>
+
+    <!-- TABS -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="configs">
+            <i class="fas fa-sliders-h"></i> Configuraciones
+        </button>
+        <button class="tab-btn" data-tab="history">
+            <i class="fas fa-history"></i> Historial de Cambios
+        </button>
+    </div>
+
+    <!-- ══ TAB: CONFIGURACIONES ══ -->
+    <div class="tab-panel active" id="tab-configs">
+
+        <!-- CPU -->
+        <div class="section-block">
+            <p class="section-label"><i class="fas fa-microchip"></i> &nbsp;CPU del servidor</p>
+            <div class="config-grid" id="grid-cpu">
+                <div th:each="cfg : ${configs}"
+                     th:if="${cfg.configKey == 'cpu.threshold' or cfg.configKey == 'cpu.check.enabled'}"
+                     class="config-card"
+                     th:classappend="${!cfg.enabled} ? ' disabled-card' : ''"
+                     th:data-key="${cfg.configKey}">
+                    <p class="config-key">
+                        <i class="fas fa-fire" style="color:var(--orange)"></i>
+                        &nbsp;<span th:text="${cfg.configKey}"></span>
+                    </p>
+                    <p class="config-desc" th:text="${cfg.description}"></p>
+                    <div class="config-row">
+                        <input type="text" th:id="'val-' + ${cfg.configKey}"
+                               th:value="${cfg.configValue}" th:data-key="${cfg.configKey}"/>
+                        <button class="btn-save" th:data-key="${cfg.configKey}">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                        <button class="btn-toggle"
+                                th:classappend="${cfg.enabled} ? ' toggle-on' : ' toggle-off'"
+                                th:text="${cfg.enabled} ? '✓ Activo' : '✗ Inactivo'"
+                                th:data-key="${cfg.configKey}"></button>
+                        <span th:id="'ok-' + ${cfg.configKey}" class="save-ok">✓ Guardado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MEMORIA -->
+        <div class="section-block">
+            <p class="section-label"><i class="fas fa-memory"></i> &nbsp;Memoria RAM</p>
+            <div class="config-grid">
+                <div th:each="cfg : ${configs}"
+                     th:if="${cfg.configKey == 'memory.threshold' or cfg.configKey == 'memory.check.enabled'}"
+                     class="config-card"
+                     th:classappend="${!cfg.enabled} ? ' disabled-card' : ''"
+                     th:data-key="${cfg.configKey}">
+                    <p class="config-key">
+                        <i class="fas fa-database" style="color:var(--primary)"></i>
+                        &nbsp;<span th:text="${cfg.configKey}"></span>
+                    </p>
+                    <p class="config-desc" th:text="${cfg.description}"></p>
+                    <div class="config-row">
+                        <input type="text" th:id="'val-' + ${cfg.configKey}"
+                               th:value="${cfg.configValue}" th:data-key="${cfg.configKey}"/>
+                        <button class="btn-save" th:data-key="${cfg.configKey}">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                        <button class="btn-toggle"
+                                th:classappend="${cfg.enabled} ? ' toggle-on' : ' toggle-off'"
+                                th:text="${cfg.enabled} ? '✓ Activo' : '✗ Inactivo'"
+                                th:data-key="${cfg.configKey}"></button>
+                        <span th:id="'ok-' + ${cfg.configKey}" class="save-ok">✓ Guardado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- INACTIVIDAD -->
+        <div class="section-block">
+            <p class="section-label"><i class="fas fa-moon"></i> &nbsp;Inactividad de hosts</p>
+            <div class="config-grid">
+                <div th:each="cfg : ${configs}"
+                     th:if="${cfg.configKey == 'host.inactive.minutes' or cfg.configKey == 'inactive.check.enabled'}"
+                     class="config-card"
+                     th:classappend="${!cfg.enabled} ? ' disabled-card' : ''"
+                     th:data-key="${cfg.configKey}">
+                    <p class="config-key">
+                        <i class="fas fa-clock" style="color:var(--text-muted)"></i>
+                        &nbsp;<span th:text="${cfg.configKey}"></span>
+                    </p>
+                    <p class="config-desc" th:text="${cfg.description}"></p>
+                    <div class="config-row">
+                        <input type="text" th:id="'val-' + ${cfg.configKey}"
+                               th:value="${cfg.configValue}" th:data-key="${cfg.configKey}"/>
+                        <button class="btn-save" th:data-key="${cfg.configKey}">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                        <button class="btn-toggle"
+                                th:classappend="${cfg.enabled} ? ' toggle-on' : ' toggle-off'"
+                                th:text="${cfg.enabled} ? '✓ Activo' : '✗ Inactivo'"
+                                th:data-key="${cfg.configKey}"></button>
+                        <span th:id="'ok-' + ${cfg.configKey}" class="save-ok">✓ Guardado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PELIGRO ROJO -->
+        <div class="section-block">
+            <p class="section-label">
+                <i class="fas fa-exclamation-triangle" style="color:var(--red)"></i>
+                &nbsp;Peligro Rojo — Caída masiva
+            </p>
+            <div class="config-grid">
+                <div th:each="cfg : ${configs}"
+                     th:if="${cfg.configKey == 'danger.red.min.hosts.percent' or cfg.configKey == 'danger.red.enabled'}"
+                     class="config-card"
+                     th:classappend="${!cfg.enabled} ? ' disabled-card' : ''"
+                     th:data-key="${cfg.configKey}">
+                    <p class="config-key">
+                        <i class="fas fa-skull-crossbones" style="color:var(--red)"></i>
+                        &nbsp;<span th:text="${cfg.configKey}"></span>
+                    </p>
+                    <p class="config-desc" th:text="${cfg.description}"></p>
+                    <div class="config-row">
+                        <input type="text" th:id="'val-' + ${cfg.configKey}"
+                               th:value="${cfg.configValue}" th:data-key="${cfg.configKey}"/>
+                        <button class="btn-save" th:data-key="${cfg.configKey}">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                        <button class="btn-toggle"
+                                th:classappend="${cfg.enabled} ? ' toggle-on' : ' toggle-off'"
+                                th:text="${cfg.enabled} ? '✓ Activo' : '✗ Inactivo'"
+                                th:data-key="${cfg.configKey}"></button>
+                        <span th:id="'ok-' + ${cfg.configKey}" class="save-ok">✓ Guardado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- INTERFACES -->
+        <div class="section-block">
+            <p class="section-label"><i class="fas fa-plug"></i> &nbsp;Nuevas interfaces (VPN/Virtual)</p>
+            <div class="config-grid">
+                <div th:each="cfg : ${configs}"
+                     th:if="${cfg.configKey == 'unknown.interface.enabled'}"
+                     class="config-card"
+                     th:classappend="${!cfg.enabled} ? ' disabled-card' : ''"
+                     th:data-key="${cfg.configKey}">
+                    <p class="config-key">
+                        <i class="fas fa-network-wired" style="color:var(--orange)"></i>
+                        &nbsp;<span th:text="${cfg.configKey}"></span>
+                    </p>
+                    <p class="config-desc" th:text="${cfg.description}"></p>
+                    <div class="config-row">
+                        <input type="text" th:id="'val-' + ${cfg.configKey}"
+                               th:value="${cfg.configValue}" th:data-key="${cfg.configKey}"/>
+                        <button class="btn-save" th:data-key="${cfg.configKey}">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                        <button class="btn-toggle"
+                                th:classappend="${cfg.enabled} ? ' toggle-on' : ' toggle-off'"
+                                th:text="${cfg.enabled} ? '✓ Activo' : '✗ Inactivo'"
+                                th:data-key="${cfg.configKey}"></button>
+                        <span th:id="'ok-' + ${cfg.configKey}" class="save-ok">✓ Guardado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PERSONALIZADAS -->
+        <div class="section-block" id="customSection">
+            <p class="section-label"><i class="fas fa-cog"></i> &nbsp;Configuraciones personalizadas</p>
+            <div class="config-grid" id="customGrid">
+                <div th:each="cfg : ${configs}"
+                     th:if="${cfg.configKey != 'cpu.threshold'
+                         and cfg.configKey != 'cpu.check.enabled'
+                         and cfg.configKey != 'memory.threshold'
+                         and cfg.configKey != 'memory.check.enabled'
+                         and cfg.configKey != 'host.inactive.minutes'
+                         and cfg.configKey != 'inactive.check.enabled'
+                         and cfg.configKey != 'danger.red.min.hosts.percent'
+                         and cfg.configKey != 'danger.red.enabled'
+                         and cfg.configKey != 'unknown.interface.enabled'}"
+                     class="config-card"
+                     th:classappend="${!cfg.enabled} ? ' disabled-card' : ''"
+                     th:data-key="${cfg.configKey}">
+                    <button class="btn-delete" th:data-key="${cfg.configKey}" title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <p class="config-key">
+                        <i class="fas fa-key" style="color:var(--text-muted)"></i>
+                        &nbsp;<span th:text="${cfg.configKey}"></span>
+                    </p>
+                    <p class="config-desc" th:text="${cfg.description}"></p>
+                    <div class="config-row">
+                        <input type="text" th:id="'val-' + ${cfg.configKey}"
+                               th:value="${cfg.configValue}" th:data-key="${cfg.configKey}"/>
+                        <button class="btn-save" th:data-key="${cfg.configKey}">
+                            <i class="fas fa-save"></i> Guardar
+                        </button>
+                        <button class="btn-toggle"
+                                th:classappend="${cfg.enabled} ? ' toggle-on' : ' toggle-off'"
+                                th:text="${cfg.enabled} ? '✓ Activo' : '✗ Inactivo'"
+                                th:data-key="${cfg.configKey}"></button>
+                        <span th:id="'ok-' + ${cfg.configKey}" class="save-ok">✓ Guardado</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- fin tab configs -->
+
+    <!-- ══ TAB: HISTORIAL ══ -->
+    <div class="tab-panel" id="tab-history">
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-history"></i> Historial de cambios</h2>
+                <button class="btn btn-sm btn-outline" id="btnRefreshHistory">
+                    <i class="fas fa-sync"></i> Actualizar
+                </button>
+            </div>
+            <div class="card-body" style="padding:0">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Clave</th>
+                            <th>Valor anterior</th>
+                            <th>Valor nuevo</th>
+                            <th>Usuario</th>
+                            <th>Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody">
+                        <tr>
+                            <td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted)">
+                                <i class="fas fa-spinner fa-spin"></i> Cargando historial...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<!-- ══ MODAL: NUEVA CONFIGURACIÓN ══ -->
+<div class="modal-bg" id="modalNuevaConfig">
+    <div class="modal-box">
+        <h3><i class="fas fa-plus-circle" style="color:var(--primary)"></i> Nueva Configuración</h3>
+        <div class="form-field">
+            <label>Clave *</label>
+            <input type="text" id="newCfgKey" placeholder="ej: mi.umbral.personalizado"/>
+        </div>
+        <div class="form-field">
+            <label>Valor *</label>
+            <input type="text" id="newCfgValue" placeholder="ej: 75"/>
+        </div>
+        <div class="form-field">
+            <label>Descripción</label>
+            <input type="text" id="newCfgDesc" placeholder="ej: Umbral personalizado para X"/>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" id="cancelNuevaConfig">Cancelar</button>
+            <button class="btn-primary" id="confirmNuevaConfig">
+                <i class="fas fa-save"></i> Crear
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MODAL: ALERTA MANUAL ══ -->
+<div class="modal-bg" id="modalNuevaAlerta">
+    <div class="modal-box">
+        <h3><i class="fas fa-bell" style="color:var(--red)"></i> Crear Alerta Manual</h3>
+        <div class="form-field">
+            <label>Título *</label>
+            <input type="text" id="alertTitle" placeholder="ej: Mantenimiento programado"/>
+        </div>
+        <div class="form-field">
+            <label>Mensaje *</label>
+            <textarea id="alertMessage" placeholder="Describe el motivo de la alerta..."></textarea>
+        </div>
+        <div class="form-field">
+            <label>Severidad</label>
+            <select id="alertSeverity">
+                <option value="INFO">🔵 INFO</option>
+                <option value="WARNING" selected>🟡 WARNING</option>
+                <option value="CRITICAL">🔴 CRITICAL</option>
+            </select>
+        </div>
+        <div class="form-field">
+            <label>Tipo</label>
+            <select id="alertType">
+                <option value="SYSTEM">SYSTEM</option>
+                <option value="HOST_DOWN">HOST_DOWN</option>
+                <option value="HOST_UP">HOST_UP</option>
+                <option value="HIGH_LATENCY">HIGH_LATENCY</option>
+                <option value="DANGER_RED">DANGER_RED</option>
+                <option value="CPU_HIGH">CPU_HIGH</option>
+                <option value="MEMORY_HIGH">MEMORY_HIGH</option>
+            </select>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" id="cancelNuevaAlerta">Cancelar</button>
+            <button class="btn-primary" id="confirmNuevaAlerta"
+                    style="background:rgba(239,68,68,.8)">
+                <i class="fas fa-bell"></i> Crear Alerta
+            </button>
+        </div>
+    </div>
+</div>
+
+<script th:src="@{/js/dashboard.js}"></script>
+<script>
+// ── TABS ──
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        if (btn.dataset.tab === 'history') loadHistory();
+    });
+});
+
+// ── DELEGACIÓN DE CLICKS EN TARJETAS ──
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.btn-save')) {
+        const key = e.target.closest('.btn-save').dataset.key;
+        saveConfig(key);
+    }
+    if (e.target.closest('.btn-toggle')) {
+        const key = e.target.closest('.btn-toggle').dataset.key;
+        toggleConfig(key);
+    }
+    if (e.target.closest('.btn-delete')) {
+        const key = e.target.closest('.btn-delete').dataset.key;
+        if (confirm('¿Eliminar la configuración "' + key + '"?')) deleteConfig(key);
+    }
+});
+
+// ── GUARDAR ──
+function saveConfig(key) {
+    const input = document.getElementById('val-' + key);
+    const val   = input ? input.value.trim() : '';
+    if (!val) { alert('El valor no puede estar vacío.'); return; }
+    fetch('/api/alert-config/' + encodeURIComponent(key), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: val })
+    }).then(r => {
+        if (r.ok) {
+            const ok = document.getElementById('ok-' + key);
+            if (ok) { ok.style.display = 'inline'; setTimeout(() => ok.style.display = 'none', 2500); }
+        } else alert('Error al guardar.');
+    }).catch(() => alert('Error de conexión.'));
+}
+
+// ── TOGGLE ──
+function toggleConfig(key) {
+    fetch('/api/alert-config/' + encodeURIComponent(key) + '/toggle', { method: 'POST' })
+        .then(r => { if (r.ok) location.reload(); else alert('Error al cambiar estado.'); })
+        .catch(() => alert('Error de conexión.'));
+}
+
+// ── ELIMINAR ──
+function deleteConfig(key) {
+    fetch('/api/alert-config/' + encodeURIComponent(key), { method: 'DELETE' })
+        .then(r => { if (r.ok) location.reload(); else alert('No se pudo eliminar.'); })
+        .catch(() => alert('Error de conexión.'));
+}
+
+// ── MODAL NUEVA CONFIG ──
+document.getElementById('btnNuevaConfig').addEventListener('click', () => {
+    document.getElementById('modalNuevaConfig').classList.add('open');
+});
+document.getElementById('cancelNuevaConfig').addEventListener('click', () => {
+    document.getElementById('modalNuevaConfig').classList.remove('open');
+});
+document.getElementById('confirmNuevaConfig').addEventListener('click', () => {
+    const key  = document.getElementById('newCfgKey').value.trim();
+    const val  = document.getElementById('newCfgValue').value.trim();
+    const desc = document.getElementById('newCfgDesc').value.trim();
+    if (!key || !val) { alert('Clave y valor son obligatorios.'); return; }
+    fetch('/api/alert-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: val, description: desc })
+    }).then(r => {
+        if (r.ok) {
+            document.getElementById('modalNuevaConfig').classList.remove('open');
+            location.reload();
+        } else r.text().then(t => alert('Error: ' + t));
+    }).catch(() => alert('Error de conexión.'));
+});
+
+// ── MODAL ALERTA MANUAL ──
+document.getElementById('btnNuevaAlerta').addEventListener('click', () => {
+    document.getElementById('modalNuevaAlerta').classList.add('open');
+});
+document.getElementById('cancelNuevaAlerta').addEventListener('click', () => {
+    document.getElementById('modalNuevaAlerta').classList.remove('open');
+});
+document.getElementById('confirmNuevaAlerta').addEventListener('click', () => {
+    const title    = document.getElementById('alertTitle').value.trim();
+    const message  = document.getElementById('alertMessage').value.trim();
+    const severity = document.getElementById('alertSeverity').value;
+    const type     = document.getElementById('alertType').value;
+    if (!title || !message) { alert('Título y mensaje son obligatorios.'); return; }
+    fetch('/api/alerts/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, message, severity, alertType: type })
+    }).then(r => {
+        if (r.ok) {
+            document.getElementById('modalNuevaAlerta').classList.remove('open');
+            alert('✅ Alerta creada correctamente.');
+            document.getElementById('alertTitle').value   = '';
+            document.getElementById('alertMessage').value = '';
+        } else r.text().then(t => alert('Error: ' + t));
+    }).catch(() => alert('Error de conexión.'));
+});
+
+// ── HISTORIAL ──
+function loadHistory() {
+    fetch('/api/alert-config/history')
+        .then(r => r.json())
+        .then(data => {
+            const tbody = document.getElementById('historyBody');
+            if (!data.length) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-muted)">Sin cambios registrados aún.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = data.map(h => `
+                <tr>
+                    <td><span class="tag-key">${h.configKey}</span></td>
+                    <td><span class="val-old">${h.oldValue ?? '—'}</span></td>
+                    <td><span class="val-new">${h.newValue ?? '—'}</span></td>
+                    <td style="color:var(--text-muted)">${h.changedBy ?? '—'}</td>
+                    <td style="color:var(--text-muted);font-size:.78rem">${formatDate(h.changedAt)}</td>
+                </tr>`).join('');
+        })
+        .catch(() => {
+            document.getElementById('historyBody').innerHTML =
+                '<tr><td colspan="5" style="text-align:center;color:var(--red)">Error al cargar el historial.</td></tr>';
+        });
+}
+
+function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-CO') + ' ' + d.toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'});
+}
+
+document.getElementById('btnRefreshHistory').addEventListener('click', loadHistory);
+</script>
+</body>
+</html>

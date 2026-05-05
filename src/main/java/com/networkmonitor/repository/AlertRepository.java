@@ -1,10 +1,12 @@
 package com.networkmonitor.repository;
 
 import com.networkmonitor.entity.Alert;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -25,6 +27,19 @@ public interface AlertRepository extends JpaRepository<Alert, Long> {
 
     List<Alert> findBySeverityAndStatus(Alert.Severity severity, Alert.AlertStatus status);
 
+    // Paginacion con filtros opcionales
+    @Query("SELECT a FROM Alert a " +
+           "WHERE (:status IS NULL OR a.status = :status) " +
+           "AND (:severity IS NULL OR a.severity = :severity) " +
+           "ORDER BY a.createdAt DESC")
+    Page<Alert> findWithFilters(
+            @Param("status")   Alert.AlertStatus status,
+            @Param("severity") Alert.Severity severity,
+            Pageable pageable);
+
     @Query("SELECT a FROM Alert a WHERE a.status = 'ACTIVE' ORDER BY a.createdAt DESC")
     List<Alert> findActiveAlerts(Pageable pageable);
+
+    // Para acciones masivas
+    List<Alert> findByIdIn(List<Long> ids);
 }

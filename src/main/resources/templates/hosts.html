@@ -9,11 +9,14 @@
 <body>
 <nav class="sidebar">
     <div class="sidebar-logo"><i class="fas fa-network-wired"></i><span>NetMonitor</span></div>
-    <ul class="sidebar-menu">
+        <ul class="sidebar-menu">
         <li><a th:href="@{/}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
         <li class="active"><a th:href="@{/hosts}"><i class="fas fa-server"></i> Hosts</a></li>
         <li><a th:href="@{/alerts}"><i class="fas fa-bell"></i> Alertas</a></li>
         <li><a th:href="@{/bandwidth}"><i class="fas fa-chart-area"></i> Ancho de Banda</a></li>
+        <li><a th:href="@{/http-monitors}"><i class="fas fa-globe"></i> Monitor HTTP</a></li>
+        <li><a th:href="@{/topology}"><i class="fas fa-project-diagram"></i> Topología</a></li>
+        <li><a th:href="@{/admin/users}"><i class="fas fa-users-cog"></i> Usuarios</a></li>
     </ul>
 </nav>
 <main class="main-content">
@@ -27,6 +30,9 @@
     <!-- Mensajes -->
     <div th:if="${param.success}" class="alert-banner success">
         <i class="fas fa-check-circle"></i> Host creado correctamente.
+    </div>
+    <div th:if="${param.updated}" class="alert-banner success">
+        <i class="fas fa-check-circle"></i> Host actualizado correctamente.
     </div>
     <div th:if="${param.deleted}" class="alert-banner info">
         <i class="fas fa-trash"></i> Host eliminado.
@@ -78,6 +84,10 @@
                             <a th:href="@{/hosts/{id}(id=${host.id})}" class="btn btn-xs" title="Ver detalle">
                                 <i class="fas fa-eye"></i>
                             </a>
+                            <button class="btn btn-xs btn-outline" title="Editar host"
+                                    th:attr="onclick=|openEditModal(${host.id},'${host.name}','${host.ipAddress}','${host.type}','${host.location}','${host.monitoredPorts}','${host.description}')|">
+                                <i class="fas fa-edit"></i>
+                            </button>
                             <form th:action="@{/hosts/{id}/ping(id=${host.id})}" method="post" style="display:inline">
                                 <button class="btn btn-xs btn-outline" title="Ping manual">
                                     <i class="fas fa-satellite-dish"></i>
@@ -155,8 +165,84 @@
     </div>
 </div>
 
+
+<!-- MODAL EDITAR HOST -->
+<div id="editHostModal" class="modal hidden">
+    <div class="modal-overlay" onclick="toggleModal('editHostModal')"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-edit"></i> Editar Host</h3>
+            <button onclick="toggleModal('editHostModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="editHostForm" method="post">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre *</label>
+                    <input type="text" id="editName" name="name" class="form-input" required/>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>IP / Hostname *</label>
+                        <input type="text" id="editIpAddress" name="ipAddress" class="form-input" required/>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo</label>
+                        <select id="editType" name="type" class="form-input">
+                            <option value="">-- Seleccionar --</option>
+                            <option value="SERVER">Servidor</option>
+                            <option value="ROUTER">Router</option>
+                            <option value="SWITCH">Switch</option>
+                            <option value="PC">PC / Workstation</option>
+                            <option value="PRINTER">Impresora</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ubicación</label>
+                        <input type="text" id="editLocation" name="location" class="form-input"/>
+                    </div>
+                    <div class="form-group">
+                        <label>Puertos monitoreados</label>
+                        <input type="text" id="editPorts" name="monitoredPorts" class="form-input"
+                               placeholder="22,80,443"/>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <textarea id="editDescription" name="description" class="form-input" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="toggleModal('editHostModal')" class="btn btn-outline">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script th:src="@{/js/dashboard.js}"></script>
+
 <script>
+function openEditModal(id, name, ip, type, location, ports, description) {
+    document.getElementById('editHostForm').action = '/hosts/' + id + '/edit';
+    document.getElementById('editName').value = name || '';
+    document.getElementById('editIpAddress').value = ip || '';
+    document.getElementById('editLocation').value = location !== 'null' ? (location || '') : '';
+    document.getElementById('editPorts').value = ports !== 'null' ? (ports || '') : '';
+    document.getElementById('editDescription').value = description !== 'null' ? (description || '') : '';
+    
+    // Set type select
+    const typeSelect = document.getElementById('editType');
+    for (let opt of typeSelect.options) {
+        opt.selected = opt.value === type;
+    }
+    
+    toggleModal('editHostModal');
+}
+
 function filterTable() {
     const q = document.getElementById('searchHosts').value.toLowerCase();
     document.querySelectorAll('#hostsTable tbody tr').forEach(row => {

@@ -4,19 +4,25 @@ import com.networkmonitor.entity.BandwidthRecord;
 import com.networkmonitor.repository.BandwidthRecordRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import oshi.SystemInfo;
+import oshi.hardware.NetworkIF;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.*;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Servicio de Monitoreo de Ancho de Banda
- * Lee estadisticas de interfaces de red del sistema operativo
+ * Servicio de Monitoreo de Ancho de Banda usando OSHI.
+ *
+ * Problema en Windows: cada adaptador físico aparece duplicado varias veces
+ * porque Windows crea una copia por cada "filter driver" instalado
+ * (WFP, QoS, Native WiFi, Hyper-V, Sophos, etc.).
+ *
+ * Solución: agrupar por displayName y quedarse con el representante de mayor
+ * bytes acumulados, que siempre es el adaptador físico real.
  */
 @Service
 @Slf4j
@@ -25,58 +31,68 @@ public class BandwidthService {
 
     private final BandwidthRecordRepository bandwidthRepository;
 
-    // Almacena la lectura anterior para calcular tasa
-    private final Map<String, long[]> previousStats = new ConcurrentHashMap<>();
-    private final Map<String, Long> previousTimestamp = new ConcurrentHashMap<>();
+    // Clave: nombre interno (ej: "wireless_1"), valor: [rxBytes, txBytes]
+    private final Map<String, long[]> previousStats     = new ConcurrentHashMap<>();
+    private final Map<String, Long>   previousTimestamp = new ConcurrentHashMap<>();
+
+    // OSHI — instancia única reutilizable
+    private final SystemInfo systemInfo = new SystemInfo();
 
     /**
-     * Captura estadisticas de todas las interfaces activas
+     * Captura bandwidth. Para cada displayName (nombre real del adaptador)
+     * solo guarda UN registro: el de la instancia con más bytes acumulados.
+     * Esto elimina la redundancia de filter-drivers de Windows.
      */
     @Transactional
     public List<BandwidthRecord> captureAllInterfaces() {
         List<BandwidthRecord> records = new ArrayList<>();
+        try {
+            List<NetworkIF> networkIFs = systemInfo.getHardware().getNetworkIFs();
+            long now = System.currentTimeMillis();
 
-        String os = System.getProperty("os.name").toLowerCase();
-        if (os.contains("linux")) {
-            records = captureLinuxStats();
-        } else if (os.contains("win")) {
-            records = captureWindowsStats();
-        } else {
-            records = captureJavaNetworkStats();
-        }
+            // ── Paso 1: actualiza atributos de todas las interfaces ───────────
+            for (NetworkIF netIF : networkIFs) {
+                netIF.updateAttributes();
+            }
 
-        if (!records.isEmpty()) {
-            bandwidthRepository.saveAll(records);
-        }
-        return records;
-    }
+            // ── Paso 2: agrupa por displayName, elige el de más bytes ─────────
+            // El adaptador físico real siempre tiene más bytes que sus copias
+            // de filter-driver (que reciben tráfico filtrado/parcial).
+            Map<String, NetworkIF> bestByDisplay = new LinkedHashMap<>();
+            for (NetworkIF netIF : networkIFs) {
+                String display = normalizeDisplayName(netIF.getDisplayName());
+                long   total   = netIF.getBytesRecv() + netIF.getBytesSent();
 
-    /**
-     * Lee /proc/net/dev en Linux
-     */
-    private List<BandwidthRecord> captureLinuxStats() {
-        List<BandwidthRecord> records = new ArrayList<>();
-        try (BufferedReader reader = new BufferedReader(new FileReader("/proc/net/dev"))) {
-            String line;
-            reader.readLine(); // skip header 1
-            reader.readLine(); // skip header 2
+                NetworkIF current = bestByDisplay.get(display);
+                if (current == null) {
+                    bestByDisplay.put(display, netIF);
+                } else {
+                    long currentTotal = current.getBytesRecv() + current.getBytesSent();
+                    if (total > currentTotal) {
+                        bestByDisplay.put(display, netIF); // este tiene más bytes → es el real
+                    }
+                }
+            }
 
-            while ((line = reader.readLine()) != null) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("lo:")) continue;
+            // ── Paso 3: guarda un registro por adaptador físico único ─────────
+            for (Map.Entry<String, NetworkIF> entry : bestByDisplay.entrySet()) {
+                NetworkIF netIF  = entry.getValue();
+                String    iface  = netIF.getName();
 
-                String[] parts = line.split("[:\\s]+");
-                if (parts.length < 10) continue;
+                // Ignora loopback y adaptadores completamente sin actividad
+                if (iface.equalsIgnoreCase("lo")) continue;
+                if (netIF.getSpeed() == 0 &&
+                    netIF.getBytesRecv() == 0 &&
+                    netIF.getBytesSent() == 0) continue;
 
-                String iface = parts[0].replace(":", "");
-                long rxBytes = Long.parseLong(parts[1]);
-                long rxPackets = Long.parseLong(parts[2]);
-                long rxErrors = Long.parseLong(parts[3]);
-                long txBytes = Long.parseLong(parts[9]);
-                long txPackets = Long.parseLong(parts[10]);
-                long txErrors = Long.parseLong(parts[11]);
+                long rxBytes   = netIF.getBytesRecv();
+                long txBytes   = netIF.getBytesSent();
+                long rxPackets = netIF.getPacketsRecv();
+                long txPackets = netIF.getPacketsSent();
+                long rxErrors  = netIF.getInErrors();
+                long txErrors  = netIF.getOutErrors();
 
-                double[] rates = calculateRates(iface, rxBytes, txBytes);
+                double[] rates = calculateRates(iface, rxBytes, txBytes, now);
 
                 BandwidthRecord record = new BandwidthRecord(
                         iface, rxBytes, txBytes, rates[0], rates[1]);
@@ -84,103 +100,100 @@ public class BandwidthService {
                 record.setTxPackets(txPackets);
                 record.setRxErrors(rxErrors);
                 record.setTxErrors(txErrors);
-
                 records.add(record);
-                log.debug("Interface {}: RX={} KB/s TX={} KB/s", iface,
-                        String.format("%.2f", rates[0]),
-                        String.format("%.2f", rates[1]));
+
+                if (rates[0] > 0 || rates[1] > 0) {
+                    log.debug("TRÁFICO [{}]: RX={} Kbps TX={} Kbps",
+                            netIF.getDisplayName(),
+                            String.format("%.1f", rates[0]),
+                            String.format("%.1f", rates[1]));
+                }
             }
-        } catch (IOException e) {
-            log.warn("No se pudo leer /proc/net/dev: {}", e.getMessage());
-            return captureJavaNetworkStats();
+
+            if (!records.isEmpty()) {
+                bandwidthRepository.saveAll(records);
+                log.debug("Captura bandwidth: {} adaptadores únicos guardados", records.size());
+            }
+
+        } catch (Exception e) {
+            log.error("Error capturando ancho de banda: {}", e.getMessage(), e);
         }
         return records;
     }
 
     /**
-     * Usa netstat en Windows
+     * Normaliza el displayName para agrupar duplicados.
+     *
+     * Windows genera nombres como:
+     *   "Intel(R) Wi-Fi 6 AX201 160MHz"
+     *   "Intel(R) Wi-Fi 6 AX201 160MHz-WFP Native MAC Layer LightWeight Filter"
+     *   "Intel(R) Wi-Fi 6 AX201 160MHz-QoS Packet Scheduler"
+     *
+     * Al eliminar el sufijo después del primer guión que precede a palabras
+     * clave de filter-driver, todos colapsan al mismo nombre base.
      */
-    private List<BandwidthRecord> captureWindowsStats() {
-        // En Windows usamos Java NetworkInterface como fallback universal
-        return captureJavaNetworkStats();
-    }
+    private String normalizeDisplayName(String displayName) {
+        if (displayName == null) return "";
 
-    /**
-     * Usa Java NetworkInterface como metodo universal
-     */
-    private List<BandwidthRecord> captureJavaNetworkStats() {
-        List<BandwidthRecord> records = new ArrayList<>();
-        try {
-            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements()) {
-                NetworkInterface ni = interfaces.nextElement();
-                if (!ni.isUp() || ni.isLoopback() || ni.isVirtual()) continue;
+        // Lista de sufijos que Windows agrega a los filter-drivers
+        String[] filterSuffixes = {
+            "-WFP", "-QoS", "-Native WiFi", "-Wireless LAN",
+            "-Microsoft", "-NDIS", "-Virtual", "-Filter",
+            "-WAN", "-Kernel", "-Packet", "-802"
+        };
 
-                String name = ni.getName() + " (" + ni.getDisplayName() + ")";
-                // Simulated stats desde Java (sin acceso real a contadores del SO)
-                BandwidthRecord record = new BandwidthRecord(
-                        ni.getName(), 0L, 0L, 0.0, 0.0);
-                records.add(record);
+        String normalized = displayName.trim();
+        for (String suffix : filterSuffixes) {
+            int idx = normalized.indexOf(suffix);
+            if (idx > 0) {
+                normalized = normalized.substring(0, idx).trim();
+                break;
             }
-        } catch (SocketException e) {
-            log.error("Error leyendo interfaces de red: {}", e.getMessage());
         }
-        return records;
+        return normalized;
     }
 
     /**
-     * Calcula la tasa de transferencia en Kbps comparando con la medicion anterior
+     * Calcula tasa diferencial en Kbps.
      */
-    private double[] calculateRates(String iface, long currentRx, long currentTx) {
-        long now = System.currentTimeMillis();
+    private double[] calculateRates(String iface, long currentRx, long currentTx, long now) {
         double rxRate = 0.0;
         double txRate = 0.0;
 
         if (previousStats.containsKey(iface)) {
-            long[] prev = previousStats.get(iface);
-            long prevTime = previousTimestamp.get(iface);
+            long[] prev       = previousStats.get(iface);
+            long   prevTime   = previousTimestamp.get(iface);
             double elapsedSec = (now - prevTime) / 1000.0;
 
             if (elapsedSec > 0) {
-                long rxDiff = currentRx - prev[0];
-                long txDiff = currentTx - prev[1];
-                // Convertir bytes/s a Kbps
-                rxRate = (rxDiff / elapsedSec) * 8 / 1024;
-                txRate = (txDiff / elapsedSec) * 8 / 1024;
-                // Evitar negativos (contador overflow)
-                rxRate = Math.max(0, rxRate);
-                txRate = Math.max(0, txRate);
+                long rxDiff = Math.max(0, currentRx - prev[0]);
+                long txDiff = Math.max(0, currentTx - prev[1]);
+                rxRate = (rxDiff * 8.0) / (elapsedSec * 1000.0);
+                txRate = (txDiff * 8.0) / (elapsedSec * 1000.0);
             }
         }
 
         previousStats.put(iface, new long[]{currentRx, currentTx});
         previousTimestamp.put(iface, now);
-
         return new double[]{rxRate, txRate};
     }
 
-    /**
-     * Obtiene historial de ancho de banda de las ultimas N horas
-     */
+    // ── API pública ───────────────────────────────────────────────────────────
+
     public List<BandwidthRecord> getBandwidthHistory(String interfaceName, int hours) {
         LocalDateTime since = LocalDateTime.now().minusHours(hours);
         return bandwidthRepository.findByInterfaceNameAndRecordedAtAfterOrderByRecordedAtAsc(
                 interfaceName, since);
     }
 
-    /**
-     * Obtiene las interfaces disponibles
-     */
     public List<String> getAvailableInterfaces() {
         return bandwidthRepository.findDistinctInterfaces();
     }
 
-    /**
-     * Limpia registros viejos (mas de 7 dias)
-     */
     @Transactional
     public void cleanOldRecords() {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(7);
         bandwidthRepository.deleteByRecordedAtBefore(cutoff);
+        log.info("Limpieza bandwidth_records completada (anteriores a {})", cutoff);
     }
 }

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Usuarios - Network Monitor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<nav class="sidebar">
+    <div class="sidebar-logo"><i class="fas fa-network-wired"></i><span>NetMonitor</span></div>
+    <ul class="sidebar-menu">
+        <li><a th:href="@{/}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+        <li><a th:href="@{/hosts}"><i class="fas fa-server"></i> Hosts</a></li>
+        <li><a th:href="@{/alerts}"><i class="fas fa-bell"></i> Alertas</a></li>
+        <li><a th:href="@{/bandwidth}"><i class="fas fa-chart-area"></i> Ancho de Banda</a></li>
+        <li><a th:href="@{/http-monitors}"><i class="fas fa-globe"></i> Monitor HTTP</a></li>
+        <li class="active"><a th:href="@{/admin/users}"><i class="fas fa-users-cog"></i> Usuarios</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar"><i class="fas fa-user-circle"></i></div>
+            <div class="user-details">
+                <span class="user-name" th:text="${currentUser}">Usuario</span>
+                <span class="badge red" style="font-size:0.7rem">ADMIN</span>
+            </div>
+        </div>
+        <form th:action="@{/logout}" method="post" style="margin-top:10px">
+            <button type="submit" class="btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Cerrar Sesion
+            </button>
+        </form>
+    </div>
+</nav>
+
+<main class="main-content">
+    <header class="page-header">
+        <h1><i class="fas fa-users-cog"></i> Panel de Administración de Usuarios</h1>
+        <button onclick="toggleModal('createUserModal')" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Nuevo Usuario
+        </button>
+    </header>
+
+    <!-- Mensajes -->
+    <div th:if="${success}" class="alert-banner success">
+        <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
+    </div>
+    <div th:if="${error}" class="alert-banner error">
+        <i class="fas fa-exclamation-circle"></i> <span th:text="${error}"></span>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" style="grid-template-columns: repeat(3,1fr); margin-bottom:24px">
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-users"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Total Usuarios</span>
+                <span class="stat-value" th:text="${#lists.size(users)}">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon red"><i class="fas fa-user-shield"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Administradores</span>
+                <span class="stat-value red-text"
+                      th:text="${#lists.size(users.?[role.name() == 'ADMIN'])}">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="fas fa-user"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Viewers</span>
+                <span class="stat-value green-text"
+                      th:text="${#lists.size(users.?[role.name() == 'VIEWER'])}">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de usuarios -->
+    <section class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-list"></i> Lista de Usuarios (<span th:text="${#lists.size(users)}">0</span>)</h2>
+        </div>
+        <div class="card-body">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Usuario</th>
+                        <th>Nombre Completo</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th>Estado</th>
+                        <th>Último Login</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="user : ${users}">
+                        <td th:text="${user.id}">-</td>
+                        <td><strong th:text="${user.username}">-</strong></td>
+                        <td th:text="${user.fullName}">-</td>
+                        <td th:text="${user.email ?: '-'}">-</td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="${user.role.name() == 'ADMIN'} ? 'red' : 'green'"
+                                  th:text="${user.role}">-</span>
+                        </td>
+                        <td>
+                            <span class="badge"
+                                  th:classappend="${user.enabled} ? 'green' : 'gray'"
+                                  th:text="${user.enabled} ? 'Activo' : 'Inactivo'">-</span>
+                        </td>
+                        <td>
+                            <span th:if="${user.lastLogin != null}"
+                                  th:text="${#temporals.format(user.lastLogin, 'dd/MM HH:mm')}">-</span>
+                            <span th:unless="${user.lastLogin != null}" class="text-muted">Nunca</span>
+                        </td>
+                        <td class="actions-cell">
+                            <!-- Cambiar Rol -->
+                            <form th:action="@{/admin/users/{id}/role(id=${user.id})}" method="post" style="display:inline">
+                                <select name="role" class="select-input"
+                                        style="padding:4px 8px;font-size:0.75rem;height:28px"
+                                        onchange="this.form.submit()">
+                                    <option value="ADMIN" th:selected="${user.role.name() == 'ADMIN'}">ADMIN</option>
+                                    <option value="VIEWER" th:selected="${user.role.name() == 'VIEWER'}">VIEWER</option>
+                                </select>
+                            </form>
+
+                            <!-- Habilitar/Deshabilitar -->
+                            <form th:action="@{/admin/users/{id}/toggle(id=${user.id})}"
+                                  method="post" style="display:inline">
+                                <button type="submit" class="btn btn-xs btn-outline"
+                                        th:title="${user.enabled} ? 'Deshabilitar' : 'Habilitar'">
+                                    <i th:class="${user.enabled} ? 'fas fa-toggle-on' : 'fas fa-toggle-off'"></i>
+                                </button>
+                            </form>
+
+                            <!-- Cambiar Contrasena -->
+                            <button type="button" class="btn btn-xs btn-outline"
+                                    th:attr="onclick=|openPasswordModal(${user.id}, &apos;${user.username}&apos;)|">
+                                <i class="fas fa-key"></i>
+                            </button>
+
+                            <!-- Eliminar -->
+                            <form th:action="@{/admin/users/{id}/delete(id=${user.id})}"
+                                  method="post" style="display:inline"
+                                  onsubmit="return confirm('¿Seguro que deseas eliminar este usuario?')">
+                                <button type="submit" class="btn btn-xs btn-danger">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<!-- MODAL CREAR USUARIO -->
+<div id="createUserModal" class="modal hidden">
+    <div class="modal-overlay" onclick="toggleModal('createUserModal')"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-user-plus"></i> Crear Nuevo Usuario</h3>
+            <button onclick="toggleModal('createUserModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <form th:action="@{/admin/users/create}" method="post">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Usuario *</label>
+                        <input type="text" name="username" class="form-input"
+                               placeholder="nombre_usuario" required/>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña *</label>
+                        <input type="password" name="password" class="form-input"
+                               placeholder="Contraseña segura" required/>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Nombre Completo *</label>
+                    <input type="text" name="fullName" class="form-input"
+                           placeholder="Juan García" required/>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" name="email" class="form-input"
+                               placeholder="correo@empresa.com"/>
+                    </div>
+                    <div class="form-group">
+                        <label>Rol *</label>
+                        <select name="role" class="form-input">
+                            <option value="VIEWER">VIEWER - Solo lectura</option>
+                            <option value="ADMIN">ADMIN - Acceso completo</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="toggleModal('createUserModal')" class="btn btn-outline">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Crear Usuario
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL CAMBIAR CONTRASENA -->
+<div id="passwordModal" class="modal hidden">
+    <div class="modal-overlay" onclick="document.getElementById('passwordModal').classList.add('hidden')"></div>
+    <div class="modal-content" style="max-width:380px">
+        <div class="modal-header">
+            <h3><i class="fas fa-key"></i> Cambiar Contraseña</h3>
+            <button onclick="document.getElementById('passwordModal').classList.add('hidden')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form id="passwordForm" method="post">
+            <div class="modal-body">
+                <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px">
+                    Usuario: <strong id="passwordModalUsername" style="color:var(--text)">-</strong>
+                </p>
+                <div class="form-group">
+                    <label>Nueva Contraseña *</label>
+                    <input type="password" name="newPassword" class="form-input"
+                           placeholder="Nueva contraseña" required minlength="4"/>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button"
+                        onclick="document.getElementById('passwordModal').classList.add('hidden')"
+                        class="btn btn-outline">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script th:src="@{/js/dashboard.js}"></script>
+<script>
+function openPasswordModal(id, username) {
+    document.getElementById('passwordModalUsername').textContent = username;
+    document.getElementById('passwordForm').action = '/admin/users/' + id + '/password';
+    document.getElementById('passwordModal').classList.remove('hidden');
+}
+function openPasswordModalFromData(btn) {
+    var id = btn.getAttribute('data-id');
+    var username = btn.getAttribute('data-username');
+    openPasswordModal(id, username);
+}
+</script>
+</body>
+</html>

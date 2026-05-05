@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Monitor HTTP - Network Monitor</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+<nav class="sidebar">
+    <div class="sidebar-logo"><i class="fas fa-network-wired"></i><span>NetMonitor</span></div>
+    <ul class="sidebar-menu">
+        <li><a th:href="@{/}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
+        <li><a th:href="@{/hosts}"><i class="fas fa-server"></i> Hosts</a></li>
+        <li><a th:href="@{/alerts}"><i class="fas fa-bell"></i> Alertas</a></li>
+        <li><a th:href="@{/bandwidth}"><i class="fas fa-chart-area"></i> Ancho de Banda</a></li>
+        <li class="active"><a th:href="@{/http-monitors}"><i class="fas fa-globe"></i> Monitor HTTP</a></li>
+        <li><a th:href="@{/admin/users}"><i class="fas fa-users-cog"></i> Usuarios</a></li>
+    </ul>
+    <div class="sidebar-footer">
+        <div class="user-info">
+            <div class="user-avatar"><i class="fas fa-user-circle"></i></div>
+            <div class="user-details">
+                <span class="user-name" sec:authentication="name">Usuario</span>
+            </div>
+        </div>
+        <form th:action="@{/logout}" method="post" style="margin-top:10px">
+            <button type="submit" class="btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Cerrar Sesion
+            </button>
+        </form>
+    </div>
+</nav>
+
+<main class="main-content">
+    <header class="page-header">
+        <h1><i class="fas fa-globe"></i> Monitor de Servicios HTTP</h1>
+        <button onclick="toggleModal('addMonitorModal')" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Agregar URL
+        </button>
+    </header>
+
+    <!-- Mensajes -->
+    <div th:if="${success}" class="alert-banner success">
+        <i class="fas fa-check-circle"></i> <span th:text="${success}"></span>
+    </div>
+    <div th:if="${error}" class="alert-banner error">
+        <i class="fas fa-exclamation-circle"></i> <span th:text="${error}"></span>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid" style="grid-template-columns: repeat(4,1fr); margin-bottom:24px">
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-globe"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Total URLs</span>
+                <span class="stat-value" th:text="${#lists.size(monitors)}">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">En Línea</span>
+                <span class="stat-value green-text"
+                      th:text="${#lists.size(monitors.?[status.name() == 'UP'])}">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon red"><i class="fas fa-times-circle"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Caídos</span>
+                <span class="stat-value red-text"
+                      th:text="${#lists.size(monitors.?[status.name() == 'DOWN'])}">0</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange"><i class="fas fa-clock"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Lentos</span>
+                <span class="stat-value orange-text"
+                      th:text="${#lists.size(monitors.?[status.name() == 'SLOW'])}">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid de monitores -->
+    <div class="monitors-grid">
+        <div th:each="monitor : ${monitors}" class="monitor-card"
+             th:classappend="${monitor.status.name() == 'UP'} ? 'up' :
+                              (${monitor.status.name() == 'DOWN'} ? 'down' :
+                              (${monitor.status.name() == 'SLOW'} ? 'slow' : 'unknown'))">
+            <div class="monitor-header">
+                <div class="monitor-status-dot"
+                     th:classappend="${monitor.status.name() == 'UP'} ? 'online' :
+                                      (${monitor.status.name() == 'DOWN'} ? 'offline' : 'degraded')">
+                </div>
+                <h3 th:text="${monitor.name}">-</h3>
+                <span class="monitor-status-badge"
+                      th:text="${monitor.status}"
+                      th:classappend="${monitor.status.name() == 'UP'} ? 'up' :
+                                       (${monitor.status.name() == 'DOWN'} ? 'down' : 'slow')">
+                </span>
+            </div>
+
+            <div class="monitor-url">
+                <a th:href="${monitor.url}" target="_blank" th:text="${monitor.url}">-</a>
+            </div>
+
+            <div class="monitor-stats">
+                <div class="monitor-stat">
+                    <label>Código HTTP</label>
+                    <span th:text="${monitor.lastResponseCode ?: '-'}"
+                          th:classappend="${monitor.lastResponseCode != null and monitor.lastResponseCode >= 200 and monitor.lastResponseCode < 400} ? 'latency-ok' : 'latency-high'">
+                    </span>
+                </div>
+                <div class="monitor-stat">
+                    <label>Tiempo Respuesta</label>
+                    <span th:if="${monitor.lastResponseTimeMs != null}"
+                          th:text="${monitor.lastResponseTimeMs} + ' ms'"
+                          th:classappend="${monitor.lastResponseTimeMs > 1000} ? 'latency-high' : 'latency-ok'">
+                    </span>
+                    <span th:unless="${monitor.lastResponseTimeMs != null}" class="text-muted">-</span>
+                </div>
+                <div class="monitor-stat">
+                    <label>Última Verificación</label>
+                    <span th:if="${monitor.lastChecked != null}"
+                          th:text="${#temporals.format(monitor.lastChecked, 'HH:mm:ss')}">-</span>
+                    <span th:unless="${monitor.lastChecked != null}" class="text-muted">Nunca</span>
+                </div>
+                <div class="monitor-stat">
+                    <label>Intervalo</label>
+                    <span th:text="${monitor.intervalSeconds} + 's'">-</span>
+                </div>
+            </div>
+
+            <div class="monitor-actions">
+                <form th:action="@{/http-monitors/{id}/check(id=${monitor.id})}"
+                      method="post" style="display:inline">
+                    <button class="btn btn-xs btn-outline" title="Verificar ahora">
+                        <i class="fas fa-sync-alt"></i> Verificar
+                    </button>
+                </form>
+                <form th:action="@{/http-monitors/{id}/delete(id=${monitor.id})}"
+                      method="post" style="display:inline"
+                      onsubmit="return confirm('¿Eliminar este monitor?')">
+                    <button class="btn btn-xs btn-danger">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div th:if="${#lists.isEmpty(monitors)}" class="empty-monitors">
+            <i class="fas fa-globe" style="font-size:3rem;color:var(--text-muted)"></i>
+            <p>No hay URLs monitoreadas.</p>
+            <button onclick="toggleModal('addMonitorModal')" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Agregar primera URL
+            </button>
+        </div>
+    </div>
+</main>
+
+<!-- MODAL AGREGAR MONITOR -->
+<div id="addMonitorModal" class="modal hidden">
+    <div class="modal-overlay" onclick="toggleModal('addMonitorModal')"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-globe"></i> Agregar Monitor HTTP</h3>
+            <button onclick="toggleModal('addMonitorModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <form th:action="@{/http-monitors/create}" method="post">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre *</label>
+                    <input type="text" name="name" class="form-input"
+                           placeholder="Mi Servidor Web" required/>
+                </div>
+                <div class="form-group">
+                    <label>URL *</label>
+                    <input type="url" name="url" class="form-input"
+                           placeholder="https://misitio.com/health" required/>
+                    <small class="form-hint">Debe incluir https:// o http://</small>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Intervalo de verificación (segundos)</label>
+                        <input type="number" name="intervalSeconds" class="form-input"
+                               value="60" min="10" max="3600"/>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Descripción</label>
+                    <input type="text" name="description" class="form-input"
+                           placeholder="Descripción opcional"/>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="toggleModal('addMonitorModal')"
+                        class="btn btn-outline">Cancelar</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script th:src="@{/js/dashboard.js}"></script>
+<script>
+// Auto-refresh cada 30 segundos
+setInterval(() => location.reload(), 30000);
+</script>
+
+<style>
+.monitors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.monitor-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    transition: transform 0.2s;
+}
+
+.monitor-card:hover { transform: translateY(-2px); }
+.monitor-card.up   { border-left: 4px solid var(--green); }
+.monitor-card.down { border-left: 4px solid var(--red); }
+.monitor-card.slow { border-left: 4px solid var(--yellow); }
+.monitor-card.unknown { border-left: 4px solid var(--text-muted); }
+
+.monitor-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.monitor-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    flex: 1;
+}
+
+.monitor-status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.monitor-status-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.monitor-status-badge.up   { background: rgba(34,197,94,0.15); color: var(--green); }
+.monitor-status-badge.down { background: rgba(239,68,68,0.15); color: var(--red); }
+.monitor-status-badge.slow { background: rgba(234,179,8,0.15); color: var(--yellow); }
+
+.monitor-url {
+    margin-bottom: 14px;
+    font-size: 0.8rem;
+}
+
+.monitor-url a {
+    color: var(--primary);
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.monitor-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.monitor-stat { display: flex; flex-direction: column; gap: 2px; }
+.monitor-stat label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; }
+.monitor-stat span { font-size: 0.88rem; font-weight: 600; }
+
+.monitor-actions { display: flex; gap: 8px; }
+
+.empty-monitors {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+</style>
+</body>
+</html>

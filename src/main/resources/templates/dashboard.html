@@ -18,31 +18,17 @@
         <i class="fas fa-network-wired"></i>
         <span>NetMonitor</span>
     </div>
-    <ul class="sidebar-menu">
+        <ul class="sidebar-menu">
         <li class="active"><a th:href="@{/}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
         <li><a th:href="@{/hosts}"><i class="fas fa-server"></i> Hosts</a></li>
-        <li><a th:href="@{/alerts}"><i class="fas fa-bell"></i> Alertas
-            <span class="badge" th:if="${activeAlerts > 0}" th:text="${activeAlerts}"></span>
-        </a></li>
+        <li><a th:href="@{/alerts}"><i class="fas fa-bell"></i> Alertas</a></li>
         <li><a th:href="@{/bandwidth}"><i class="fas fa-chart-area"></i> Ancho de Banda</a></li>
+        <li><a th:href="@{/http-monitors}"><i class="fas fa-globe"></i> Monitor HTTP</a></li>
+        <li><a th:href="@{/topology}"><i class="fas fa-project-diagram"></i> Topología</a></li>
+        <li><a th:href="@{/admin/users}"><i class="fas fa-users-cog"></i> Usuarios</a></li>
     </ul>
     <div class="sidebar-footer">
-        <div class="user-info">
-            <div class="user-avatar">
-                <i class="fas fa-user-circle"></i>
-            </div>
-            <div class="user-details">
-                <span class="user-name" sec:authentication="name">Usuario</span>
-            </div>
-        </div>
-        <form th:action="@{/logout}" method="post" style="margin-top:10px">
-            <button type="submit" class="btn-logout">
-                <i class="fas fa-sign-out-alt"></i> Cerrar Sesion
-            </button>
-        </form>
-        <div style="margin-top:8px">
-            <span id="clock" style="font-size:0.75rem;color:var(--text-muted)"></span>
-        </div>
+        <span id="clock"></span>
     </div>
 </nav>
 
