@@ -1,2 +1,0 @@
-@echo off
-mvn spring-boot:run -Dspring-boot.run.jvmArguments="-Dspring.datasource.url=jdbc:sqlserver://SF-KTABORDA:1433;databaseName=SMRED;encrypt=false;trustServerCertificate=true -Dspring.datasource.username=sa -Dspring.datasource.password=TdeA.2025"
