@@ -1,0 +1,26 @@
+{
+  "name": "smred",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SMRED - Sistema de Monitoreo de Red",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22.22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w frontend",
+    "start": "npm run start -w backend",
+    "test": "npm test -w backend",
+    "lint": "npm run lint --workspaces",
+    "db:migrate": "npm run db:migrate -w backend",
+    "db:rollback": "npm run db:rollback -w backend",
+    "db:make": "npm run db:make -w backend --"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+  "js/ts.implicitProjectConfig.checkJs": true,
+  "files.eol": "\n",
+  "files.associations": { "*.css": "tailwindcss" }
+}

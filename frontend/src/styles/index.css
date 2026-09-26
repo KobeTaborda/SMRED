@@ -1,0 +1,158 @@
+@import 'tailwindcss';
+
+/*
+ * Sistema visual de SMRED: vidrio translúcido sobre luces de color.
+ * Los dos modos (oscuro y claro) solo cambian estas variables; los componentes usan
+ * clases como bg-bg, text-muted, text-accent-strong, border-line, glass, tile.
+ */
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #10121e;
+  --text: #e9e9ed;
+  --muted: #a4a6ba;
+  --accent: #9184d9;
+  --accent-strong: #c9c2f5;
+  --accent-bg: rgba(145, 132, 217, 0.18);
+  --accent-border: rgba(145, 132, 217, 0.5);
+  --danger: #f0937b;
+  --danger-bg: rgba(240, 147, 123, 0.14);
+  --warning: #f2c77a;
+  --warning-bg: rgba(242, 199, 122, 0.12);
+  --line: rgba(255, 255, 255, 0.08);
+  --tile: rgba(255, 255, 255, 0.06);
+  --hover: rgba(255, 255, 255, 0.08);
+  --field: rgba(0, 0, 0, 0.22);
+  --field-border: rgba(255, 255, 255, 0.16);
+  --glass-from: rgba(255, 255, 255, 0.16);
+  --glass-to: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-inset: rgba(255, 255, 255, 0.35);
+  --glass-shadow: rgba(0, 0, 0, 0.45);
+  --light-1: #9184d9;
+  --light-2: #4b3fa8;
+  --light-3: #2f6f8f;
+  --backdrop: rgba(8, 9, 16, 0.6);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --bg: #e8e7f2;
+  --text: #1c1e30;
+  --muted: #55586f;
+  --accent: #5b4fb0;
+  --accent-strong: #4a3fa0;
+  --accent-bg: rgba(145, 132, 217, 0.16);
+  --accent-border: rgba(91, 79, 176, 0.45);
+  --danger: #b03a22;
+  --danger-bg: rgba(194, 71, 46, 0.1);
+  --warning: #8a5a00;
+  --warning-bg: rgba(191, 132, 20, 0.12);
+  --line: rgba(28, 30, 48, 0.08);
+  --tile: rgba(255, 255, 255, 0.5);
+  --hover: rgba(28, 30, 48, 0.06);
+  --field: rgba(255, 255, 255, 0.65);
+  --field-border: rgba(28, 30, 48, 0.14);
+  --glass-from: rgba(255, 255, 255, 0.72);
+  --glass-to: rgba(255, 255, 255, 0.38);
+  --glass-border: rgba(255, 255, 255, 0.85);
+  --glass-inset: rgba(255, 255, 255, 0.95);
+  --glass-shadow: rgba(60, 50, 120, 0.18);
+  --light-1: #b8afef;
+  --light-2: #9184d9;
+  --light-3: #bcd3f2;
+  --backdrop: rgba(40, 36, 80, 0.35);
+}
+
+@theme inline {
+  --font-sans: 'Plus Jakarta Sans Variable', system-ui, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+  --font-logo: 'Manrope', 'Plus Jakarta Sans Variable', sans-serif;
+
+  --color-bg: var(--bg);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-border: var(--accent-border);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-line: var(--line);
+  --color-tile: var(--tile);
+  --color-hover: var(--hover);
+  --color-field: var(--field);
+  --color-field-border: var(--field-border);
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    transition: background-color 0.3s ease;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+
+  dialog::backdrop {
+    background: var(--backdrop);
+    backdrop-filter: blur(4px);
+  }
+}
+
+@layer components {
+  /* Panel de vidrio: desenfoque, brillo en el borde superior y sombra suave */
+  .glass {
+    background: linear-gradient(135deg, var(--glass-from), var(--glass-to));
+    backdrop-filter: blur(22px) saturate(170%);
+    -webkit-backdrop-filter: blur(22px) saturate(170%);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      inset 0 1px 0 var(--glass-inset),
+      0 20px 50px var(--glass-shadow);
+  }
+
+  /* Recuadro interior (cifras, filas destacadas) */
+  .tile {
+    background: var(--tile);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+  }
+
+  .eyebrow {
+    @apply text-[13px] tracking-[0.08em] uppercase text-accent-strong;
+  }
+}
+
+@keyframes status-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.blink {
+  animation: status-blink 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
