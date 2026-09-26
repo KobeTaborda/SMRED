@@ -36,7 +36,7 @@ export function LoginPage() {
 
       <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-12 px-6 py-10 md:px-12 lg:grid-cols-[minmax(0,1fr)_440px] lg:gap-20">
         <div className="flex max-w-xl flex-col gap-5">
-          <span className="eyebrow">Monitoreo de red</span>
+          <span className="eyebrow">Sistema de Monitoreo de red</span>
           <h1 className="text-[44px] leading-[1.02] font-semibold tracking-[-0.025em] text-balance md:text-[64px]">Toda tu red, a la vista</h1>
           <p className="text-lg leading-relaxed text-muted">
             Sistema de Monitorización de infraestructura TI en tiempo real. Detecta anomalías en componentes críticos y automatiza alertas operativas para reaccionar lo antes posible.
