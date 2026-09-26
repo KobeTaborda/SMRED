@@ -39,7 +39,7 @@ export function LoginPage() {
           <span className="eyebrow">Monitoreo de red</span>
           <h1 className="text-[44px] leading-[1.02] font-semibold tracking-[-0.025em] text-balance md:text-[64px]">Toda tu red, a la vista</h1>
           <p className="text-lg leading-relaxed text-muted">
-            SMRED revisa tus computadores, impresoras, routers y servidores cada pocos segundos y te avisa cuando algo deja de responder.
+            Sistema de Monitorización de infraestructura TI en tiempo real. Detecta anomalías en componentes críticos y automatiza alertas operativas para reaccionar lo antes posible.
           </p>
           <div className="mt-1 flex flex-wrap gap-5">
             <StatusBadge status="UP" />
