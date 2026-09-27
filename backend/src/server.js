@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs'
+import { createServer } from 'node:https'
 import { createApp } from './app.js'
+import { createLoginAttemptRepository } from './auth/login-attempt.repository.js'
 import { LoginAttempts } from './auth/login-attempts.js'
 import { SqlSessionStore } from './auth/session-store.js'
 import { loadConfig } from './config/env.js'
@@ -54,13 +57,25 @@ async function main() {
     logger,
   })
   const sessionStore = new SqlSessionStore(db, { ttlMs: config.session.ttlMs, logger })
-  const loginAttempts = new LoginAttempts({ maxAttempts: config.security.maxLoginAttempts, lockMs: config.security.lockMs })
+  const loginAttempts = new LoginAttempts({
+    repository: createLoginAttemptRepository(db),
+    maxAttempts: config.security.maxLoginAttempts,
+    lockMs: config.security.lockMs,
+  })
 
   await seedInitialAdmin({ userService, seedAdmin: config.seedAdmin, logger })
 
   const app = createApp({ config, logger, userRepository, userService, hostService, pingMonitor, statsService, loginAttempts, sessionStore })
-  const server = app.listen(config.port, () => logger.info(`API escuchando en http://localhost:${config.port}`))
-  const scheduler = startScheduler({ pingMonitor, sessionStore, config: config.monitoring, logger })
+  const onListen = (protocol) => () => logger.info(`API escuchando en ${protocol}://localhost:${config.port}`)
+  let server
+  if (config.https.enabled) {
+    const tls = { cert: readFileSync(config.https.certFile), key: readFileSync(config.https.keyFile) }
+    server = createServer(tls, app).listen(config.port, onListen('https'))
+  } else {
+    logger.warn('Sin certificado en certs/: la API usa HTTP. Para activar HTTPS ejecuta scripts/generar-certificado.ps1')
+    server = app.listen(config.port, onListen('http'))
+  }
+  const scheduler = startScheduler({ pingMonitor, sessionStore, loginAttempts, config: config.monitoring, logger })
 
   // Apagado ordenado: termina las peticiones en curso y cierra las conexiones a la BD
   const shutdown = async (signal) => {

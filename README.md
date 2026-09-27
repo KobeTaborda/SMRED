@@ -114,7 +114,23 @@ Reglas para las contraseñas:
 
 El archivo `.env` es personal: **nunca lo subas a GitHub** (ya está excluido en `.gitignore`).
 
-## 7. Arrancar SMRED
+## 7. Activar HTTPS
+
+SMRED funciona con conexión cifrada (HTTPS) usando un certificado de confianza local. Se configura una sola vez:
+
+```powershell
+winget install -e --id FiloSottile.mkcert
+```
+
+Cierra y vuelve a abrir la terminal de VS Code, y ejecuta:
+
+```powershell
+.\scripts\generar-certificado.ps1
+```
+
+La primera vez Windows pregunta si confías en el certificado de mkcert: responde **Sí**. El certificado queda en la carpeta `certs\`, que no se sube a GitHub; cada integrante genera el suyo.
+
+## 8. Arrancar SMRED
 
 ```powershell
 .\scripts\verificar-entorno.ps1
@@ -126,11 +142,13 @@ npm install
 - `npm install` instala las librerías del proyecto.
 - `iniciar.ps1` abre Docker, levanta SQL Server y arranca la aplicación.
 
-La primera vez tarda varios minutos, porque descarga SQL Server (~1,5 GB). Cuando veas `API escuchando en http://localhost:3000` y `Local: http://localhost:5173/`, abre **http://localhost:5173** e inicia sesión con el usuario y la contraseña de administrador de tu `.env`.
+La primera vez tarda varios minutos, porque descarga SQL Server (~1,5 GB). Cuando veas `API escuchando en https://localhost:3000` y `Local: https://localhost:5173/`, abre **https://localhost:5173** e inicia sesión con el usuario y la contraseña de administrador de tu `.env`.
 
 Cada integrante tiene su **propia base de datos** en su equipo, así que tu usuario administrador es solo tuyo.
 
-## 8. Rutina diaria
+Para cambiar tu contraseña usa el ícono de llave  en la barra superior. Las cuentas que crees desde **Usuarios** reciben una contraseña temporal: la persona debe elegir la suya al entrar por primera vez.
+
+## 9. Rutina diaria
 
 Para empezar a trabajar:
 
@@ -147,19 +165,37 @@ Para terminar: `Ctrl + C` en la terminal y luego:
 
 Esto apaga SQL Server y Docker y libera la memoria. Los datos se conservan para la próxima vez.
 
-## 9. Actualizar el proyecto
+## 10. Actualizar el proyecto
 
 Cuando haya cambios nuevos en GitHub:
 
 ```powershell
 git pull
-npm install
 .\scripts\iniciar.ps1
 ```
 
-Los cambios en la base de datos se aplican solos al arrancar.
+`iniciar.ps1` instala solo las librerías nuevas, y los cambios en la base de datos se aplican solos al arrancar.
 
-## 10. Ver la base de datos (opcional)
+## 11. Subir tus cambios
+
+Trabaja cada cambio en su propia rama:
+
+```powershell
+git pull
+git switch -c nombre-del-cambio
+# ... haces tus cambios ...
+git add .
+git commit -m "Describe qué cambiaste"
+git push -u origin nombre-del-cambio
+```
+
+Antes de cada `git push`, SMRED revisa el código automáticamente (lint y tests). **Si algo falla, la subida se cancela** y la terminal muestra el error: corrígelo y vuelve a ejecutar `git push`.
+
+Luego, en GitHub, usa el botón **Compare & pull request**, espera a que la verificación salga en verde y haz **Merge** hacia `main`.
+
+Para revisar el código sin subir nada: `npm run verify`.
+
+## 12. Ver la base de datos (opcional)
 
 Con la extensión **SQL Server** de VS Code: ícono de SQL Server en la barra lateral → **Add Connection**:
 
@@ -175,7 +211,7 @@ Con la extensión **SQL Server** de VS Code: ícono de SQL Server en la barra la
 
 Úsala para consultar datos, no para modificarlos a mano.
 
-## 11. Sin Docker: SQL Server Express
+## 13. Sin Docker: SQL Server Express
 
 Si tu equipo no puede usar Docker:
 
@@ -190,75 +226,20 @@ Si tu equipo no puede usar Docker:
 4. En tu `.env`, descomenta `DB_INSTANCE=SQLEXPRESS` y usa la misma contraseña en `DB_APP_PASSWORD`.
 5. Arranca con `npm run dev` en lugar de `iniciar.ps1`.
 
-## 12. Problemas comunes
+## 14. Problemas comunes
 
 | Síntoma | Solución |
 |---|---|
 | `No se puede cargar el archivo ... no está firmado digitalmente` | Ejecuta `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`. Si persiste: `Get-ChildItem .\scripts\*.ps1 \| Unblock-File` |
-
 | `Configuración inválida: Falta ...` | No existe el `.env` en la carpeta del proyecto, o esa variable está vacía. |
-
 | `No se pudo conectar a SQL Server` | Docker Desktop no está abierto o el contenedor no arrancó: revisa con `docker compose ps`. |
-
 | `Login failed for user 'smred_app'` | Cambiaste la contraseña en `.env` después de crear la base: ejecuta `docker compose up sqlserver-init`. |
-
 | El contenedor `sqlserver` se reinicia una y otra vez | `DB_SA_PASSWORD` no cumple las reglas de contraseña de SQL Server. |
-
 | `Port 1433 is already allocated` | Hay otro SQL Server instalado. Cambia `DB_PORT=1434` en tu `.env`. |
-
 | `Port 5173 is in use` | La app ya está abierta en otra terminal. Ciérrala con `Ctrl + C` o cierra esa terminal. |
-
 | `Failed to resolve import ...` | Faltan librerías: ejecuta `npm install`. |
-
+| `La subida se canceló` al hacer `git push` | El lint o los tests encontraron un error. Lee el mensaje de arriba, corrígelo y vuelve a subir. |
+| `Falta mkcert` al generar el certificado | Instálalo con `winget install -e --id FiloSottile.mkcert`, cierra y abre la terminal, y repite. |
+| El navegador dice que la conexión no es privada | Ejecuta otra vez `.\scripts\generar-certificado.ps1` y acepta la confirmación de Windows. Usa Chrome o Edge (Firefox necesita pasos extra). |
+| `Cuenta bloqueada temporalmente` | Hubo 5 intentos fallidos desde tu equipo. Espera 15 minutos, o pide a un administrador que restablezca tu contraseña (eso te desbloquea al instante). |
 | Todos los equipos aparecen *Sin respuesta* | Revisa que el firewall de la red permita ping (ICMP). Prueba con `ping 8.8.8.8` en la terminal. |
-
-
-
-## 13. API 
-
-| Método | Ruta | Acceso | Descripción |
-|---|---|---|---|
-| GET | `/api/health` | Público | Estado del servicio |
-| GET | `/api/auth/csrf` | Público | Entrega el token CSRF |
-| POST | `/api/auth/login` | Público | Inicia sesión |
-| POST | `/api/auth/logout` | Autenticado | Cierra sesión |
-| GET | `/api/auth/me` | Autenticado | Usuario actual |
-| GET | `/api/hosts` | Autenticado | Lista de hosts con estado |
-| GET | `/api/hosts/:id` | Autenticado | Detalle de un host |
-| GET | `/api/hosts/:id/pings?hours=24` | Autenticado | Historial de ping (máx. 168 h) |
-| GET | `/api/hosts/:id/pings?limit=6` | Autenticado | Últimas N revisiones |
-| GET | `/api/hosts/:id/stats?period=24h` | Autenticado | Disponibilidad, latencias y franjas (`24h` o `7d`) |
-| GET | `/api/overview` | Autenticado | Tendencia de latencia de toda la red (últimas 2 h) |
-| POST | `/api/hosts` | ADMIN | Crear host |
-| PUT | `/api/hosts/:id` | ADMIN | Editar host |
-| DELETE | `/api/hosts/:id` | ADMIN | Eliminar host (y su historial) |
-| POST | `/api/hosts/:id/check` | ADMIN | Verificar ahora |
-| GET / POST | `/api/users` | ADMIN | Listar / crear usuarios |
-| PUT / DELETE | `/api/users/:id` | ADMIN | Editar / eliminar usuario |
-| PUT | `/api/users/:id/password` | ADMIN | Restablecer contraseña |
-
-Las peticiones que modifican datos requieren el header `X-XSRF-TOKEN`. Los errores siempre llegan como [Problem Details (RFC 9457)](https://www.rfc-editor.org/rfc/rfc9457): `{ status, title, detail, errors? }`.
-
-
-## 14. Organización **por funcionalidad**: cada módulo tiene sus rutas, reglas de negocio y acceso a datos juntos.
-
-
-```
-backend/src/
-├── config/       Variables de entorno (validadas con Zod) y logger
-├── db/           Conexión Knex y migraciones (esquema de SQL Server)
-├── common/       Errores (Problem Details), validación, utilidades
-├── auth/         Login, sesión en BD, CSRF, bloqueo por intentos, permisos
-├── users/        Usuarios y roles (ADMIN / VIEWER)
-├── hosts/        Dispositivos monitoreados + evento de cambio de estado
-├── monitoring/   Ping periódico, historial y limpieza automática
-├── app.js        Arma la app Express (recibe sus dependencias)
-└── server.js     Punto de entrada: conecta BD, migra y arranca
-
-frontend/src/
-├── lib/          Cliente HTTP (sesión + CSRF), React Query, formatos
-├── components/   Layout (barra, fondo de luces, logo, tema) y componentes de interfaz
-└── features/     auth · dashboard · hosts (lista y detalle) · users
-```
-
-Cada módulo sigue el mismo patrón: `*.routes.js` (HTTP) → `*.service.js` (reglas) → `*.repository.js` (SQL).

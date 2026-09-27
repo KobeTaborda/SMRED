@@ -5,11 +5,10 @@ import { CheckboxField, SelectField, TextField } from '@/components/ui/Field'
 import { ApiError, errorMessage } from '@/lib/api'
 import { useToast } from '@/lib/toast'
 import { useCreateUser, useResetPassword, useUpdateUser } from './api'
+import { TemporaryPasswordField } from './TemporaryPasswordField'
 
 /** @typedef {import('@/features/auth/types').User} User */
 /** @typedef {import('@/features/auth/types').Role} Role */
-
-const PASSWORD_HINT = 'Mínimo 10 caracteres.'
 
 function formErrors(error) {
   const fieldErrors = error instanceof ApiError ? error.fieldErrors : {}
@@ -52,7 +51,7 @@ export function CreateUserForm({ onDone }) {
     event.preventDefault()
     create.mutate(form, {
       onSuccess: (user) => {
-        notify({ title: 'Usuario creado', description: `${user.fullName} ya puede iniciar sesión como ${user.username}.` })
+        notify({ title: 'Usuario creado', description: `${user.fullName} entra como ${user.username} y elegirá su propia contraseña al ingresar.` })
         onDone()
       },
     })
@@ -65,9 +64,8 @@ export function CreateUserForm({ onDone }) {
         onChange={(e) => setForm({ ...form, username: e.target.value })} />
       <TextField label="Nombre completo" value={form.fullName} error={fieldErrors.fullName}
         onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
-      <TextField label="Contraseña" type="password" autoComplete="new-password" hint={PASSWORD_HINT}
-        value={form.password} error={fieldErrors.password}
-        onChange={(e) => setForm({ ...form, password: e.target.value })} />
+      <TemporaryPasswordField value={form.password} error={fieldErrors.password}
+        onChange={(password) => setForm({ ...form, password })} />
       <RoleSelect value={form.role} error={fieldErrors.role} onChange={(role) => setForm({ ...form, role })} />
       <FormActions onCancel={onDone} loading={create.isPending} submitLabel="Crear usuario" />
     </form>
@@ -115,7 +113,7 @@ export function ResetPasswordForm({ user, onDone }) {
     event.preventDefault()
     reset.mutate({ id: user.id, password }, {
       onSuccess: () => {
-        notify({ title: 'Contraseña restablecida', description: `Compártela con ${user.fullName} por un medio seguro.` })
+        notify({ title: 'Contraseña restablecida', description: `Compártela con ${user.fullName} por un medio seguro. Si su cuenta estaba bloqueada, ya quedó desbloqueada.` })
         onDone()
       },
     })
@@ -125,8 +123,7 @@ export function ResetPasswordForm({ user, onDone }) {
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
       {general && <ErrorBanner message={general} />}
       <p className="text-[15px] text-muted">Nueva contraseña para <span className="font-mono text-ink">{user.username}</span>.</p>
-      <TextField label="Nueva contraseña" type="password" autoComplete="new-password" hint={PASSWORD_HINT}
-        value={password} error={fieldErrors.password} onChange={(e) => setPassword(e.target.value)} />
+      <TemporaryPasswordField label="Nueva contraseña temporal" value={password} error={fieldErrors.password} onChange={setPassword} />
       <FormActions onCancel={onDone} loading={reset.isPending} submitLabel="Restablecer contraseña" />
     </form>
   )

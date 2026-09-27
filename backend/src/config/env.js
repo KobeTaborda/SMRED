@@ -53,7 +53,18 @@ const envSchema = z.object({
   PING_DEGRADED_MS: z.coerce.number().positive().default(200),
   PING_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(20),
   PING_RETENTION_DAYS: z.coerce.number().int().min(1).default(7),
+
+  // HTTPS: si existen estos dos archivos, el servidor usa HTTPS (ver scripts/generar-certificado.ps1)
+  SSL_CERT_FILE: z.string().optional(),
+  SSL_KEY_FILE: z.string().optional(),
 })
+
+/** Certificado en certs/ (raíz del repo) por defecto. HTTPS se activa solo si ambos archivos existen. */
+function httpsConfig(env) {
+  const certFile = resolve(backendDir, env.SSL_CERT_FILE ?? '../certs/smred.pem')
+  const keyFile = resolve(backendDir, env.SSL_KEY_FILE ?? '../certs/smred-key.pem')
+  return { enabled: existsSync(certFile) && existsSync(keyFile), certFile, keyFile }
+}
 
 /** Lee y valida la configuración. Si falta algo, falla al arrancar con un mensaje claro. */
 export function loadConfig() {
@@ -109,6 +120,7 @@ export function loadConfig() {
       retentionDays: env.PING_RETENTION_DAYS,
       cleanupCron: '0 3 * * *',
     },
+    https: httpsConfig(env),
     frontendDist: resolve(backendDir, '../frontend/dist'),
   }
 }

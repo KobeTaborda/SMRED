@@ -29,6 +29,6 @@ BEGIN
 END
 GO
 
--- db_owner solo sobre ESTA base: Flyway necesita crear tablas. El usuario no tiene permisos en el servidor.
+-- db_owner solo sobre ESTA base: las migraciones de Knex necesitan crear tablas. El usuario no tiene permisos en el servidor.
 ALTER ROLE db_owner ADD MEMBER [$(DB_APP_USER)];
 GO

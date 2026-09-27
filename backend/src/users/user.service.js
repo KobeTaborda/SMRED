@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs'
-import { businessRule, conflict, notFound } from '../common/errors.js'
+import { badRequest, businessRule, conflict, notFound } from '../common/errors.js'
 
 /**
  * Reglas de negocio de usuarios.
@@ -37,12 +37,16 @@ export function createUserService(repo, { bcryptRounds, logger }) {
       return user && matches && user.enabled ? user : null
     },
 
-    async create({ username, fullName, password, role }) {
+    /**
+     * Las cuentas que crea un administrador deben cambiar la contraseña al primer ingreso:
+     * así el administrador nunca conoce la contraseña definitiva de otra persona.
+     */
+    async create({ username, fullName, password, role }, { mustChangePassword = true } = {}) {
       if (await repo.existsByUsername(username)) {
         throw conflict(`Ya existe un usuario llamado ${username}.`)
       }
       const passwordHash = await bcrypt.hash(password, bcryptRounds)
-      const user = await repo.insert({ username, passwordHash, fullName, role })
+      const user = await repo.insert({ username, passwordHash, fullName, role, mustChangePassword })
       logger.info({ username, role }, 'Usuario creado')
       return user
     },
@@ -59,10 +63,26 @@ export function createUserService(repo, { bcryptRounds, logger }) {
       return repo.update(id, { fullName, role, enabled })
     },
 
+    /** Restablecimiento por un administrador: cierra las sesiones del usuario y lo obliga a elegir una nueva. */
     async resetPassword(id, password) {
       const user = await getOrFail(id)
-      await repo.updatePassword(id, await bcrypt.hash(password, bcryptRounds))
-      logger.info({ username: user.username }, 'Contraseña restablecida')
+      await repo.updatePassword(id, await bcrypt.hash(password, bcryptRounds), { mustChangePassword: true })
+      logger.info({ username: user.username }, 'Contraseña restablecida por un administrador')
+      return user
+    },
+
+    /** El propio usuario cambia su contraseña. Devuelve el usuario actualizado (con su nueva token_version). */
+    async changeOwnPassword(user, currentPassword, newPassword) {
+      const current = await getOrFail(user.id)
+      if (!(await bcrypt.compare(currentPassword, current.passwordHash))) {
+        throw badRequest('Revisa los campos marcados.', { errors: { currentPassword: 'La contraseña actual no es correcta.' } })
+      }
+      if (await bcrypt.compare(newPassword, current.passwordHash)) {
+        throw badRequest('Revisa los campos marcados.', { errors: { newPassword: 'Debe ser distinta de la contraseña actual.' } })
+      }
+      const updated = await repo.updatePassword(user.id, await bcrypt.hash(newPassword, bcryptRounds), { mustChangePassword: false })
+      logger.info({ username: user.username }, 'El usuario cambió su contraseña')
+      return updated
     },
 
     async remove(id, currentUser) {

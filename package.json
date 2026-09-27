@@ -18,9 +18,12 @@
     "lint": "npm run lint --workspaces",
     "db:migrate": "npm run db:migrate -w backend",
     "db:rollback": "npm run db:rollback -w backend",
-    "db:make": "npm run db:make -w backend --"
+    "db:make": "npm run db:make -w backend --",
+    "prepare": "husky",
+    "verify": "npm run lint && npm test"
   },
   "devDependencies": {
-    "concurrently": "^10.0.5"
+    "concurrently": "^10.0.5",
+    "husky": "^9.1.7"
   }
 }

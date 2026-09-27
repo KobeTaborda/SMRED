@@ -10,6 +10,10 @@ export const queryClient = new QueryClient({
       if (error instanceof ApiError && error.status === 401) {
         queryClient.setQueryData(ME_QUERY_KEY, null)
       }
+      // Un administrador restableció la contraseña: el guard lleva a la pantalla de cambio
+      if (error instanceof ApiError && error.problem?.code === 'PASSWORD_CHANGE_REQUIRED') {
+        queryClient.invalidateQueries({ queryKey: ME_QUERY_KEY })
+      }
     },
   }),
   defaultOptions: {
