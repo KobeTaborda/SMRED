@@ -11,7 +11,13 @@ export function createLoginAttemptRepository(db) {
     async get(key) {
       const row = await table().where({ attempt_key: key }).first()
       if (!row) return null
-      return { failures: row.failures, firstFailureAt: ms(row.first_failure_at), lockedUntil: ms(row.locked_until) }
+      return {
+        failures: row.failures,
+        firstFailureAt: ms(row.first_failure_at),
+        lockedUntil: ms(row.locked_until),
+        lockCount: row.lock_count ?? 0,
+        lastFailureAt: ms(row.updated_at),
+      }
     },
 
     async save(key, entry) {
@@ -19,7 +25,9 @@ export function createLoginAttemptRepository(db) {
         failures: entry.failures,
         first_failure_at: new Date(entry.firstFailureAt),
         locked_until: entry.lockedUntil ? new Date(entry.lockedUntil) : null,
-        updated_at: new Date(),
+        lock_count: entry.lockCount,
+        // updated_at = momento del último intento fallido (sirve para olvidar la escalada tras un día)
+        updated_at: new Date(entry.lastFailureAt),
       }
       const updated = await table().where({ attempt_key: key }).update(row)
       if (updated > 0) return
@@ -42,10 +50,10 @@ export function createLoginAttemptRepository(db) {
       await table().whereRaw("attempt_key LIKE ? ESCAPE '\\'", [`${escaped}|%`]).del()
     },
 
-    async deleteStale(before) {
+    async deleteStale(before, now) {
       return table()
         .where('updated_at', '<', new Date(before))
-        .andWhere((q) => q.whereNull('locked_until').orWhere('locked_until', '<', new Date()))
+        .andWhere((q) => q.whereNull('locked_until').orWhere('locked_until', '<', new Date(now)))
         .del()
     },
   }
