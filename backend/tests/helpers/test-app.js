@@ -2,7 +2,7 @@ import session from 'express-session'
 import request from 'supertest'
 import pino from 'pino'
 import { createApp } from '../../src/app.js'
-import { LoginAttempts } from '../../src/auth/login-attempts.js'
+import { createMemoryAttemptRepository, LoginAttempts } from '../../src/auth/login-attempts.js'
 import { createHostService } from '../../src/hosts/host.service.js'
 import { createPingMonitor } from '../../src/monitoring/ping-monitor.service.js'
 import { createStatsService } from '../../src/monitoring/stats.js'
@@ -17,6 +17,7 @@ const config = {
   isProduction: false,
   session: { secret: 'x'.repeat(32), ttlMs: 30 * 60_000 },
   monitoring: { attempts: 3, timeoutMs: 1000, degradedLatencyMs: 200, maxConcurrency: 5, retentionDays: 7, intervalMs: 30_000 },
+  https: { enabled: false },
   frontendDist: '/ruta/que/no/existe',
 }
 
@@ -31,10 +32,11 @@ export async function createTestApp() {
   const probe = createFakeProbe()
   const pingMonitor = createPingMonitor({ hostService, pingRepository, probe, config: config.monitoring, logger })
   const statsService = createStatsService({ hostService, pingRepository, config: config.monitoring })
-  const loginAttempts = new LoginAttempts({ maxAttempts: 5, lockMs: 15 * 60_000 })
+  const loginAttempts = new LoginAttempts({ repository: createMemoryAttemptRepository(), maxAttempts: 5, lockMs: 15 * 60_000 })
 
-  await userService.create(ADMIN)
-  await userService.create(VIEWER)
+  // Cuentas ya activadas (sin cambio de contraseña pendiente) para la mayoría de los tests
+  await userService.create(ADMIN, { mustChangePassword: false })
+  await userService.create(VIEWER, { mustChangePassword: false })
 
   const app = createApp({
     config, logger, userRepository, userService, hostService, pingMonitor, statsService, loginAttempts,
@@ -47,9 +49,15 @@ export async function createTestApp() {
  * Cliente que se comporta como el navegador: guarda cookies y envía el token CSRF.
  */
 export class Client {
-  constructor(app) {
+  /** @param {string} [ip] IP de origen simulada: se envía como X-Forwarded-For (igual que el proxy de Vite) */
+  constructor(app, ip) {
     this.agent = request.agent(app)
     this.csrf = null
+    this.ip = ip
+  }
+
+  withIp(req) {
+    return this.ip ? req.set('X-Forwarded-For', this.ip) : req
   }
 
   track(res) {
@@ -62,16 +70,16 @@ export class Client {
   }
 
   async ensureCsrf() {
-    if (!this.csrf) this.track(await this.agent.get('/api/auth/csrf'))
+    if (!this.csrf) this.track(await this.withIp(this.agent.get('/api/auth/csrf')))
   }
 
   async get(path) {
-    return this.track(await this.agent.get(path))
+    return this.track(await this.withIp(this.agent.get(path)))
   }
 
   async send(method, path, body) {
     await this.ensureCsrf()
-    let req = this.agent[method](path).set('X-XSRF-TOKEN', this.csrf)
+    let req = this.withIp(this.agent[method](path)).set('X-XSRF-TOKEN', this.csrf)
     if (body !== undefined) req = req.send(body)
     return this.track(await req)
   }

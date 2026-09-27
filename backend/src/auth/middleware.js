@@ -1,8 +1,9 @@
 import { forbidden, unauthorized } from '../common/errors.js'
 
 /**
- * Carga el usuario de la sesión en cada petición. Si fue eliminado o deshabilitado,
- * la sesión se invalida de inmediato (no hay que esperar a que venza).
+ * Carga el usuario de la sesión en cada petición. La sesión deja de valer de inmediato si:
+ * - la cuenta fue eliminada o deshabilitada, o
+ * - la contraseña cambió después de abrir la sesión (token_version distinta).
  * @param {{ findById: (id: number) => Promise<any> }} userRepository
  */
 export function loadCurrentUser(userRepository) {
@@ -11,13 +12,26 @@ export function loadCurrentUser(userRepository) {
     if (!userId) return next()
 
     const user = await userRepository.findById(userId)
-    if (user?.enabled) {
+    const sameVersion = (req.session.tokenVersion ?? 0) === (user?.tokenVersion ?? 0)
+    if (user?.enabled && sameVersion) {
       req.user = user
       return next()
     }
     delete req.session.userId
+    delete req.session.tokenVersion
     next()
   }
+}
+
+/**
+ * Mientras el usuario deba cambiar su contraseña, solo puede usar las rutas de /auth
+ * (ver su cuenta, cambiar la contraseña, cerrar sesión). El resto responde 403.
+ */
+export function requirePasswordChangeFirst(req, _res, next) {
+  if (req.user?.mustChangePassword && !req.path.startsWith('/auth/')) {
+    return next(forbidden('Debes cambiar tu contraseña antes de continuar.', { code: 'PASSWORD_CHANGE_REQUIRED' }))
+  }
+  next()
 }
 
 export function requireAuth(req, _res, next) {

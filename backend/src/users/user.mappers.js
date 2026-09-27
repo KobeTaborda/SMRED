@@ -11,6 +11,8 @@ export const ROLES = /** @type {const} */ (['ADMIN', 'VIEWER'])
  * @property {'ADMIN'|'VIEWER'} role
  * @property {boolean} enabled
  * @property {Date} createdAt
+ * @property {number} tokenVersion
+ * @property {boolean} mustChangePassword
  */
 
 /** Fila de la BD (snake_case) → objeto de dominio (camelCase). */
@@ -24,6 +26,8 @@ export function toUser(row) {
     role: row.role,
     enabled: Boolean(row.enabled),
     createdAt: row.created_at,
+    tokenVersion: row.token_version ?? 0,
+    mustChangePassword: Boolean(row.must_change_password),
   }
 }
 
@@ -36,5 +40,6 @@ export function toUserResponse(user) {
     role: user.role,
     enabled: user.enabled,
     createdAt: toIso(user.createdAt),
+    mustChangePassword: user.mustChangePassword,
   }
 }

@@ -55,11 +55,21 @@ if ($estado -ne "healthy") {
 }
 Write-Host "SQL Server listo." -ForegroundColor Green
 
-if (-not (Test-Path "node_modules")) {
-    Write-Host "Instalando dependencias (solo la primera vez)..." -ForegroundColor Cyan
+# Instala librerías la primera vez, o cuando alguien agregó librerías nuevas (package-lock.json más reciente)
+$lock = "package-lock.json"
+$instalado = "node_modules\.package-lock.json"
+if (-not (Test-Path $instalado) -or (Get-Item $lock).LastWriteTime -gt (Get-Item $instalado).LastWriteTime) {
+    Write-Host "Instalando librerías nuevas..." -ForegroundColor Cyan
     npm install
     if ($LASTEXITCODE -ne 0) { exit 1 }
 }
 
-Write-Host "Arrancando SMRED. Abre http://localhost:5173  (Ctrl + C para detener)" -ForegroundColor Green
+if ((Test-Path "certs\smred.pem") -and (Test-Path "certs\smred-key.pem")) {
+    $url = "https://localhost:5173"
+} else {
+    $url = "http://localhost:5173"
+    Write-Host "Aviso: sin certificado, SMRED usa HTTP. Para activar HTTPS: .\scripts\generar-certificado.ps1" -ForegroundColor Yellow
+}
+
+Write-Host "Arrancando SMRED. Abre $url  (Ctrl + C para detener)" -ForegroundColor Green
 npm run dev

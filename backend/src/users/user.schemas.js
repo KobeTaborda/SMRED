@@ -33,3 +33,8 @@ export const updateUserSchema = z.object({
 })
 
 export const resetPasswordSchema = z.object({ password })
+
+export const changeOwnPasswordSchema = z.object({
+  currentPassword: z.string({ error: 'Escribe tu contraseña actual.' }).min(1, 'Escribe tu contraseña actual.').max(72),
+  newPassword: password,
+})

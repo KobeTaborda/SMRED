@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router'
 import { IconButton } from '@/components/ui/Button'
-import { DeviceIcon, HomeIcon, LogoutIcon, UsersIcon } from '@/components/ui/icons'
+import { Modal } from '@/components/ui/Modal'
+import { DeviceIcon, HomeIcon, KeyIcon, LogoutIcon, UsersIcon } from '@/components/ui/icons'
+import { ChangePasswordForm } from '@/features/auth/ChangePasswordForm'
 import { ROLE_LABELS } from '@/features/auth/types'
 import { useCurrentUser, useLogout } from '@/features/auth/useAuth'
 import { initials } from '@/lib/format'
+import { useToast } from '@/lib/toast'
 import { Background } from './Background'
 import { Logo } from './Logo'
 import { ThemeToggle } from './ThemeToggle'
@@ -17,6 +21,8 @@ const links = [
 export function AppLayout() {
   const { data: user } = useCurrentUser()
   const logout = useLogout()
+  const { notify } = useToast()
+  const [changingPassword, setChangingPassword] = useState(false)
   const visible = links.filter((link) => !link.adminOnly || user?.role === 'ADMIN')
 
   return (
@@ -51,6 +57,9 @@ export function AppLayout() {
             <span aria-hidden="true" className="mx-1 inline-flex size-9 items-center justify-center rounded-full border border-accent-border bg-accent-bg text-[13px] font-semibold">
               {user && initials(user.fullName)}
             </span>
+            <IconButton label="Cambiar mi contraseña" onClick={() => setChangingPassword(true)}>
+              <KeyIcon className="size-[18px]" />
+            </IconButton>
             <IconButton label="Cerrar sesión" onClick={() => logout.mutate()}>
               <LogoutIcon className="size-[18px]" />
             </IconButton>
@@ -61,6 +70,18 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      <Modal open={changingPassword} title="Cambiar mi contraseña" onClose={() => setChangingPassword(false)} size="sm">
+        {changingPassword && (
+          <ChangePasswordForm
+            onCancel={() => setChangingPassword(false)}
+            onDone={() => {
+              setChangingPassword(false)
+              notify({ title: 'Contraseña cambiada', description: 'Se cerraron tus sesiones en otros equipos.' })
+            }}
+          />
+        )}
+      </Modal>
 
       {/* Navegación inferior en celulares: al alcance del pulgar */}
       <nav aria-label="Principal" className="glass fixed inset-x-4 bottom-4 z-40 flex gap-1 rounded-[32px] p-1.5 md:hidden">

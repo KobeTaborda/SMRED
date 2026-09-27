@@ -5,7 +5,11 @@ import { toUserResponse } from './user.mappers.js'
 import { createUserSchema, resetPasswordSchema, updateUserSchema } from './user.schemas.js'
 
 /** Gestión de usuarios. El acceso de solo ADMIN se aplica al montar el router (app.js). */
-export function createUserRouter(userService) {
+/**
+ * @param {any} userService
+ * @param {import('../auth/login-attempts.js').LoginAttempts} loginAttempts
+ */
+export function createUserRouter(userService, loginAttempts) {
   const router = Router()
 
   router.param('id', (req, _res, next, value) => {
@@ -27,7 +31,9 @@ export function createUserRouter(userService) {
   })
 
   router.put('/:id/password', validateBody(resetPasswordSchema), async (req, res) => {
-    await userService.resetPassword(req.userId, req.body.password)
+    const user = await userService.resetPassword(req.userId, req.body.password)
+    // Restablecer también desbloquea la cuenta si estaba bloqueada por intentos fallidos
+    await loginAttempts.clearUser(user.username)
     res.status(204).end()
   })
 

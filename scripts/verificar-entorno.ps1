@@ -35,6 +35,12 @@ if ($versionNode -match '^\d+\.\d+\.\d+$' -and [version]$versionNode -lt [versio
     $ok = $false
 }
 
+if ((Test-Path "certs\smred.pem") -and (Test-Path "certs\smred-key.pem")) {
+    Write-Host "[OK]    HTTPS activo (certificado en certs\)" -ForegroundColor Green
+} else {
+    Write-Host "[INFO]  Sin certificado: SMRED usará HTTP. Para activar HTTPS: .\scripts\generar-certificado.ps1" -ForegroundColor Yellow
+}
+
 if (Test-Path ".env") {
     Write-Host "[OK]    Archivo .env encontrado" -ForegroundColor Green
 } else {

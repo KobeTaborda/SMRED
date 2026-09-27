@@ -14,6 +14,6 @@ export async function seedInitialAdmin({ userService, seedAdmin, logger }) {
     logger.warn('SMRED_ADMIN_PASSWORD debe tener al menos 10 caracteres. No se creó el administrador.')
     return
   }
-  await userService.create({ username, password, fullName, role: 'ADMIN' })
+  await userService.create({ username, password, fullName, role: 'ADMIN' }, { mustChangePassword: false })
   logger.info({ username }, 'Administrador inicial creado')
 }

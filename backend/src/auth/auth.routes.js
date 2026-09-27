@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { tooManyAttempts, unauthorized } from '../common/errors.js'
 import { validateBody } from '../common/validate.js'
 import { toUserResponse } from '../users/user.mappers.js'
+import { changeOwnPasswordSchema } from '../users/user.schemas.js'
 import { CSRF_COOKIE, issueCsrfToken } from './csrf.js'
 import { requireAuth } from './middleware.js'
 
@@ -14,11 +15,10 @@ const loginSchema = z.object({
 
 /**
  * @param {{ userService: any, loginAttempts: import('./login-attempts.js').LoginAttempts,
- *           config: any, sessionCookieName: string }} deps
+ *           sessionCookieName: string }} deps
  */
-export function createAuthRouter({ userService, loginAttempts, config, sessionCookieName }) {
+export function createAuthRouter({ userService, loginAttempts, sessionCookieName }) {
   const router = Router()
-  const secure = config.isProduction
 
   // Segunda capa contra fuerza bruta: límite por IP (la primera es el bloqueo por usuario)
   const loginLimiter = rateLimit({
@@ -31,28 +31,25 @@ export function createAuthRouter({ userService, loginAttempts, config, sessionCo
 
   /** La SPA lo llama al iniciar para obtener la cookie XSRF-TOKEN. */
   router.get('/csrf', (req, res) => {
-    const token = issueCsrfToken(req, res, { secure })
+    const token = issueCsrfToken(req, res)
     res.json({ headerName: 'X-XSRF-TOKEN', token })
   })
 
   router.post('/login', loginLimiter, validateBody(loginSchema), async (req, res) => {
     const { username, password } = req.body
 
-    const lockMs = loginAttempts.remainingLockMs(username)
+    const lockMs = await loginAttempts.remainingLockMs(username, req.ip)
     if (lockMs > 0) throw tooManyAttempts(Math.ceil(lockMs / 1000))
 
     const user = await userService.authenticate(username, password)
     if (!user) {
-      loginAttempts.recordFailure(username)
+      await loginAttempts.recordFailure(username, req.ip)
       // Mensaje genérico: no revela si el usuario existe o está deshabilitado
       throw unauthorized('Usuario o contraseña incorrectos.')
     }
-    loginAttempts.recordSuccess(username)
+    await loginAttempts.recordSuccess(username, req.ip)
 
-    // Nueva sesión al autenticar: evita ataques de fijación de sesión
-    await regenerateSession(req)
-    req.session.userId = user.id
-    issueCsrfToken(req, res, { secure })
+    await startSession(req, res, user)
     res.json(toUserResponse(user))
   })
 
@@ -69,7 +66,25 @@ export function createAuthRouter({ userService, loginAttempts, config, sessionCo
     res.json(toUserResponse(req.user))
   })
 
+  /**
+   * El usuario cambia su propia contraseña. Se cierran sus sesiones en otros equipos
+   * (sube token_version) y esta sesión continúa con un id nuevo.
+   */
+  router.put('/password', loginLimiter, requireAuth, validateBody(changeOwnPasswordSchema), async (req, res) => {
+    const updated = await userService.changeOwnPassword(req.user, req.body.currentPassword, req.body.newPassword)
+    await startSession(req, res, updated)
+    res.json(toUserResponse(updated))
+  })
+
   return router
+}
+
+/** Nueva sesión al autenticar o cambiar la contraseña: evita ataques de fijación de sesión. */
+async function startSession(req, res, user) {
+  await regenerateSession(req)
+  req.session.userId = user.id
+  req.session.tokenVersion = user.tokenVersion
+  issueCsrfToken(req, res)
 }
 
 function regenerateSession(req) {

@@ -27,8 +27,10 @@ export function createFakeUserRepository() {
     async countActiveAdmins() {
       return [...rows.values()].filter((u) => u.role === 'ADMIN' && u.enabled).length
     },
-    async insert({ username, passwordHash, fullName, role }) {
-      const user = { id: nextId++, username, passwordHash, fullName, role, enabled: true, createdAt: new Date() }
+    async insert({ username, passwordHash, fullName, role, mustChangePassword = false }) {
+      const user = {
+        id: nextId++, username, passwordHash, fullName, role, enabled: true, createdAt: new Date(), tokenVersion: 0, mustChangePassword,
+      }
       rows.set(user.id, user)
       return clone(user)
     },
@@ -36,8 +38,10 @@ export function createFakeUserRepository() {
       Object.assign(rows.get(id), { fullName, role, enabled })
       return clone(rows.get(id))
     },
-    async updatePassword(id, passwordHash) {
-      rows.get(id).passwordHash = passwordHash
+    async updatePassword(id, passwordHash, { mustChangePassword }) {
+      const user = rows.get(id)
+      Object.assign(user, { passwordHash, mustChangePassword, tokenVersion: user.tokenVersion + 1 })
+      return clone(user)
     },
     async delete(id) {
       rows.delete(id)

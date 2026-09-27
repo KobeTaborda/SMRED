@@ -9,6 +9,7 @@
  * @property {Role} role
  * @property {boolean} enabled
  * @property {string} createdAt
+ * @property {boolean} mustChangePassword
  */
 
 export const ROLE_LABELS = { ADMIN: 'Administrador', VIEWER: 'Solo lectura' }

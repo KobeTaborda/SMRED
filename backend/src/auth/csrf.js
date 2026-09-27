@@ -12,9 +12,10 @@ export const CSRF_HEADER = 'x-xsrf-token'
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 
 /** Crea (si no existe) el token de la sesión y lo envía en la cookie. */
-export function issueCsrfToken(req, res, { secure }) {
+export function issueCsrfToken(req, res) {
   req.session.csrfToken ??= randomBytes(32).toString('base64url')
-  res.cookie(CSRF_COOKIE, req.session.csrfToken, { httpOnly: false, sameSite: 'lax', secure, path: '/' })
+  // secure = true cuando la conexión es HTTPS: la cookie nunca viaja sin cifrar
+  res.cookie(CSRF_COOKIE, req.session.csrfToken, { httpOnly: false, sameSite: 'lax', secure: req.secure, path: '/' })
   return req.session.csrfToken
 }
 

@@ -3,6 +3,7 @@ import { createBrowserRouter, Link, RouterProvider } from 'react-router'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { EmptyState, Loading } from '@/components/ui/Feedback'
 import { RequireAdmin, RequireAuth } from '@/features/auth/guards'
+import { ChangePasswordPage } from '@/features/auth/ChangePasswordPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { HostsPage } from '@/features/hosts/HostsPage'
@@ -13,6 +14,7 @@ const HostDetailPage = lazy(() => import('@/features/hosts/HostDetailPage').then
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
+  { path: '/cambiar-contrasena', element: <ChangePasswordPage /> },
   {
     path: '/',
     element: (

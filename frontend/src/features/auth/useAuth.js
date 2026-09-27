@@ -43,6 +43,16 @@ export function useLogout() {
   })
 }
 
+export function useChangePassword() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    /** @param {{ currentPassword: string, newPassword: string }} data */
+    mutationFn: (data) => api('/auth/password', { method: 'PUT', body: data }),
+    // La respuesta trae el usuario actualizado (mustChangePassword: false)
+    onSuccess: (user) => queryClient.setQueryData(ME_QUERY_KEY, user),
+  })
+}
+
 export function useIsAdmin() {
   const { data } = useCurrentUser()
   return data?.role === 'ADMIN'

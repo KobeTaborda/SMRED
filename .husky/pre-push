@@ -1,0 +1,10 @@
+# Se ejecuta automáticamente en cada "git push".
+# Si el lint o los tests fallan, la subida se cancela y el código no llega a GitHub.
+echo ""
+echo "SMRED: verificando el código antes de subir (lint y tests)..."
+if ! npm run verify --silent; then
+  echo ""
+  echo "La subida se canceló: corrige los errores de arriba y vuelve a ejecutar git push."
+  exit 1
+fi
+echo "Todo en orden. Subiendo..."

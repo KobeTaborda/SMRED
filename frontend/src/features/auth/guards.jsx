@@ -17,6 +17,7 @@ export function RequireAuth({ children }) {
     )
   }
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />
+  if (user.mustChangePassword) return <Navigate to="/cambiar-contrasena" replace />
   return children
 }
 

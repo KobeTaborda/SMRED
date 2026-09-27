@@ -5,7 +5,7 @@ import session from 'express-session'
 import helmet from 'helmet'
 import { createAuthRouter } from './auth/auth.routes.js'
 import { csrfProtection } from './auth/csrf.js'
-import { loadCurrentUser, requireAdmin, requireAdminForWrites, requireAuth } from './auth/middleware.js'
+import { loadCurrentUser, requireAdmin, requireAdminForWrites, requireAuth, requirePasswordChangeFirst } from './auth/middleware.js'
 import { apiNotFound, errorHandler } from './common/error-handler.js'
 import { createHostRouter } from './hosts/host.routes.js'
 import { createMonitoringRouter, createOverviewRouter } from './monitoring/monitoring.routes.js'
@@ -20,8 +20,9 @@ export const SESSION_COOKIE = 'smred.sid'
 export function createApp({ config, logger, userRepository, userService, hostService, pingMonitor, statsService, loginAttempts, sessionStore }) {
   const app = express()
   app.disable('x-powered-by')
-  // Detrás de un proxy HTTPS en la nube, para que las cookies "secure" funcionen
-  if (config.isProduction) app.set('trust proxy', 1)
+  // En producción, detrás del proxy HTTPS de la nube. En desarrollo, detrás del proxy de Vite (en este mismo equipo):
+  // así req.ip es la IP real del navegador, que usa el bloqueo por intentos fallidos.
+  app.set('trust proxy', config.isProduction ? 1 : 'loopback')
 
   app.use(
     helmet({
@@ -33,8 +34,13 @@ export function createApp({ config, logger, userRepository, userService, hostSer
           fontSrc: ["'self'", 'data:'],
           objectSrc: ["'none'"],
           frameAncestors: ["'none'"],
+          // Pedir todo por HTTPS solo cuando el sitio se sirve por HTTPS
+          upgradeInsecureRequests: config.https.enabled ? [] : null,
         },
       },
+      // HSTS obliga al navegador a usar siempre HTTPS con este dominio. Solo en producción:
+      // en localhost afectaría a cualquier otro proyecto que corras en tu equipo.
+      strictTransportSecurity: config.isProduction,
     }),
   )
   app.use(express.json({ limit: '100kb' }))
@@ -46,7 +52,8 @@ export function createApp({ config, logger, userRepository, userService, hostSer
       resave: false,
       saveUninitialized: false,
       rolling: true, // cada petición renueva la expiración: la sesión vence tras X minutos de inactividad
-      cookie: { httpOnly: true, sameSite: 'lax', secure: config.isProduction, maxAge: config.session.ttlMs },
+      // secure 'auto': la cookie solo viaja cifrada cuando la conexión es HTTPS
+      cookie: { httpOnly: true, sameSite: 'lax', secure: 'auto', maxAge: config.session.ttlMs },
     }),
   )
 
@@ -55,8 +62,9 @@ export function createApp({ config, logger, userRepository, userService, hostSer
   const api = express.Router()
   api.use(csrfProtection)
   api.use(loadCurrentUser(userRepository))
-  api.use('/auth', createAuthRouter({ userService, loginAttempts, config, sessionCookieName: SESSION_COOKIE }))
-  api.use('/users', requireAdmin, createUserRouter(userService))
+  api.use(requirePasswordChangeFirst)
+  api.use('/auth', createAuthRouter({ userService, loginAttempts, sessionCookieName: SESSION_COOKIE }))
+  api.use('/users', requireAdmin, createUserRouter(userService, loginAttempts))
   api.use('/hosts', requireAdminForWrites, createHostRouter(hostService), createMonitoringRouter(pingMonitor, statsService))
   api.use('/overview', requireAuth, createOverviewRouter(statsService))
   api.use(apiNotFound)

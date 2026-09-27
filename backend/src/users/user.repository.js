@@ -35,9 +35,9 @@ export function createUserRepository(db) {
       return Number(total)
     },
 
-    async insert({ username, passwordHash, fullName, role }) {
+    async insert({ username, passwordHash, fullName, role, mustChangePassword = false }) {
       const [{ id }] = await table().insert(
-        { username, password_hash: passwordHash, full_name: fullName, role },
+        { username, password_hash: passwordHash, full_name: fullName, role, must_change_password: mustChangePassword },
         ['id'],
       )
       return this.findById(id)
@@ -48,8 +48,18 @@ export function createUserRepository(db) {
       return this.findById(id)
     },
 
-    async updatePassword(id, passwordHash) {
-      await table().where({ id }).update({ password_hash: passwordHash, updated_at: new Date() })
+    /**
+     * Cambia la contraseña y sube token_version: todas las sesiones abiertas con la versión
+     * anterior dejan de ser válidas.
+     */
+    async updatePassword(id, passwordHash, { mustChangePassword }) {
+      await table().where({ id }).update({
+        password_hash: passwordHash,
+        must_change_password: mustChangePassword,
+        token_version: db.raw('token_version + 1'),
+        updated_at: new Date(),
+      })
+      return this.findById(id)
     },
 
     async delete(id) {
