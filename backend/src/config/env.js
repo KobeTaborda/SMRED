@@ -102,8 +102,11 @@ export function loadConfig() {
     },
     security: {
       bcryptRounds: 12,
-      maxLoginAttempts: 5,
-      lockMs: 15 * 60_000,
+      // Bloqueo progresivo: 4 fallos → 5 min; 4 más → 10 min; luego 15, 20...
+      maxLoginAttempts: 4,
+      lockStepMs: 5 * 60_000,
+      failureWindowMs: 15 * 60_000,
+      lockResetAfterMs: 24 * 60 * 60_000,
     },
     seedAdmin: {
       username: env.SMRED_ADMIN_USERNAME?.trim() || undefined,

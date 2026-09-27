@@ -33,17 +33,18 @@ describe('API /api/auth', () => {
     assert.equal(wrongPassword.body.detail, unknownUser.body.detail)
   })
 
-  it('bloquea la cuenta tras 5 intentos fallidos', async () => {
+  it('bloquea 5 minutos tras 4 intentos fallidos', async () => {
     const client = new Client(ctx.app)
-    for (let i = 0; i < 5; i++) await client.login({ username: 'admin', password: 'incorrecta' })
+    for (let i = 0; i < 4; i++) await client.login({ username: 'admin', password: 'incorrecta' })
     const res = await client.login(ADMIN) // ni siquiera la contraseña correcta entra
     assert.equal(res.status, 429)
-    assert.ok(res.headers['retry-after'])
+    assert.equal(res.headers['retry-after'], '300')
+    assert.match(res.body.detail, /5 min/)
   })
 
   it('el bloqueo de un equipo no impide entrar desde otro', async () => {
     const attacker = new Client(ctx.app, '192.168.10.99')
-    for (let i = 0; i < 5; i++) await attacker.login({ username: 'admin', password: 'incorrecta' })
+    for (let i = 0; i < 4; i++) await attacker.login({ username: 'admin', password: 'incorrecta' })
     assert.equal((await attacker.login(ADMIN)).status, 429)
 
     const owner = new Client(ctx.app, '192.168.10.10')
@@ -121,7 +122,7 @@ describe('API /api/auth/password', () => {
 
   it('restablecer la contraseña desbloquea una cuenta bloqueada por intentos fallidos', async () => {
     const viewer = new Client(ctx.app, '192.168.10.30')
-    for (let i = 0; i < 5; i++) await viewer.login({ username: 'viewer', password: 'incorrecta' })
+    for (let i = 0; i < 4; i++) await viewer.login({ username: 'viewer', password: 'incorrecta' })
     assert.equal((await viewer.login(VIEWER)).status, 429)
 
     const admin = new Client(ctx.app, '192.168.10.10')

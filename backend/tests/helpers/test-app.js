@@ -32,7 +32,13 @@ export async function createTestApp() {
   const probe = createFakeProbe()
   const pingMonitor = createPingMonitor({ hostService, pingRepository, probe, config: config.monitoring, logger })
   const statsService = createStatsService({ hostService, pingRepository, config: config.monitoring })
-  const loginAttempts = new LoginAttempts({ repository: createMemoryAttemptRepository(), maxAttempts: 5, lockMs: 15 * 60_000 })
+  const loginAttempts = new LoginAttempts({
+    repository: createMemoryAttemptRepository(),
+    maxAttempts: 4,
+    lockStepMs: 5 * 60_000,
+    windowMs: 15 * 60_000,
+    resetAfterMs: 24 * 60 * 60_000,
+  })
 
   // Cuentas ya activadas (sin cambio de contraseña pendiente) para la mayoría de los tests
   await userService.create(ADMIN, { mustChangePassword: false })

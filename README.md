@@ -241,5 +241,5 @@ Si tu equipo no puede usar Docker:
 | `La subida se canceló` al hacer `git push` | El lint o los tests encontraron un error. Lee el mensaje de arriba, corrígelo y vuelve a subir. |
 | `Falta mkcert` al generar el certificado | Instálalo con `winget install -e --id FiloSottile.mkcert`, cierra y abre la terminal, y repite. |
 | El navegador dice que la conexión no es privada | Ejecuta otra vez `.\scripts\generar-certificado.ps1` y acepta la confirmación de Windows. Usa Chrome o Edge (Firefox necesita pasos extra). |
-| `Cuenta bloqueada temporalmente` | Hubo 5 intentos fallidos desde tu equipo. Espera 15 minutos, o pide a un administrador que restablezca tu contraseña (eso te desbloquea al instante). |
+| `Cuenta bloqueada temporalmente` | Hubo 4 intentos fallidos desde tu equipo. El primer bloqueo dura 5 minutos, y cada nuevo bloqueo suma 5 más (10, 15...). Espera el tiempo que indica el mensaje, o pide a un administrador que restablezca tu contraseña (eso te desbloquea al instante). |
 | Todos los equipos aparecen *Sin respuesta* | Revisa que el firewall de la red permita ping (ICMP). Prueba con `ping 8.8.8.8` en la terminal. |

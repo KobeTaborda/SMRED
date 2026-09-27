@@ -60,7 +60,9 @@ async function main() {
   const loginAttempts = new LoginAttempts({
     repository: createLoginAttemptRepository(db),
     maxAttempts: config.security.maxLoginAttempts,
-    lockMs: config.security.lockMs,
+    lockStepMs: config.security.lockStepMs,
+    windowMs: config.security.failureWindowMs,
+    resetAfterMs: config.security.lockResetAfterMs,
   })
 
   await seedInitialAdmin({ userService, seedAdmin: config.seedAdmin, logger })

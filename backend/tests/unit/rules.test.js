@@ -20,53 +20,93 @@ describe('isValidHostAddress', () => {
   }
 })
 
-describe('LoginAttempts', () => {
+describe('LoginAttempts (bloqueo progresivo)', () => {
+  const MIN = 60_000
   const setup = () => {
-    let now = 1_000_000
-    const attempts = new LoginAttempts({ repository: createMemoryAttemptRepository(), maxAttempts: 3, lockMs: 15 * 60_000, now: () => now })
-    return { attempts, advance: (ms) => (now += ms) }
+    let now = 1_000_000_000
+    const attempts = new LoginAttempts({
+      repository: createMemoryAttemptRepository(),
+      maxAttempts: 4,
+      lockStepMs: 5 * MIN,
+      windowMs: 15 * MIN,
+      resetAfterMs: 24 * 60 * MIN,
+      now: () => now,
+    })
+    const fail = async (times, ip = IP_A, user = 'admin') => {
+      for (let i = 0; i < times; i++) await attempts.recordFailure(user, ip)
+    }
+    return { attempts, fail, advance: (ms) => (now += ms) }
   }
   const IP_A = '192.168.10.50'
   const IP_B = '192.168.10.77'
 
-  it('bloquea al llegar al máximo, sin distinguir mayúsculas', async () => {
-    const { attempts } = setup()
-    await attempts.recordFailure('admin', IP_A)
-    await attempts.recordFailure('admin', IP_A)
+  it('3 fallos no bloquean; el cuarto bloquea 5 minutos (sin distinguir mayúsculas)', async () => {
+    const { attempts, fail } = setup()
+    await fail(3)
     assert.equal(await attempts.remainingLockMs('admin', IP_A), 0)
     await attempts.recordFailure('ADMIN', IP_A)
-    assert.equal(await attempts.remainingLockMs('admin', IP_A), 15 * 60_000)
+    assert.equal(await attempts.remainingLockMs('admin', IP_A), 5 * MIN)
+  })
+
+  it('cada ciclo de bloqueo suma 5 minutos: 5, 10, 15, 20', async () => {
+    const { attempts, fail, advance } = setup()
+    for (const expected of [5, 10, 15, 20]) {
+      await fail(4)
+      assert.equal(await attempts.remainingLockMs('admin', IP_A), expected * MIN, `ciclo de ${expected} min`)
+      advance(expected * MIN) // esperar a que termine el bloqueo
+      assert.equal(await attempts.remainingLockMs('admin', IP_A), 0)
+    }
   })
 
   it('el bloqueo es por equipo: otro equipo puede seguir entrando', async () => {
-    const { attempts } = setup()
-    for (let i = 0; i < 3; i++) await attempts.recordFailure('admin', IP_B)
+    const { attempts, fail } = setup()
+    await fail(4, IP_B)
     assert.ok((await attempts.remainingLockMs('admin', IP_B)) > 0)
     assert.equal(await attempts.remainingLockMs('admin', IP_A), 0)
   })
 
-  it('desbloquea cuando vence el tiempo', async () => {
-    const { attempts, advance } = setup()
-    for (let i = 0; i < 3; i++) await attempts.recordFailure('admin', IP_A)
-    advance(16 * 60_000)
-    assert.equal(await attempts.remainingLockMs('admin', IP_A), 0)
-  })
-
   it('los fallos espaciados en el tiempo no se acumulan', async () => {
-    const { attempts, advance } = setup()
-    await attempts.recordFailure('admin', IP_A)
-    await attempts.recordFailure('admin', IP_A)
-    advance(20 * 60_000) // pasó la ventana de 15 minutos
-    await attempts.recordFailure('admin', IP_A)
+    const { attempts, fail, advance } = setup()
+    await fail(3)
+    advance(20 * MIN) // pasó la ventana de 15 minutos
+    await fail(1)
     assert.equal(await attempts.remainingLockMs('admin', IP_A), 0)
   })
 
-  it('un login exitoso reinicia el contador', async () => {
-    const { attempts } = setup()
-    await attempts.recordFailure('admin', IP_A)
-    await attempts.recordFailure('admin', IP_A)
+  it('un login exitoso reinicia la escalada', async () => {
+    const { attempts, fail, advance } = setup()
+    await fail(4) // primer bloqueo: 5 min
+    advance(5 * MIN)
     await attempts.recordSuccess('admin', IP_A)
-    await attempts.recordFailure('admin', IP_A)
+    await fail(4)
+    assert.equal(await attempts.remainingLockMs('admin', IP_A), 5 * MIN) // vuelve a 5, no a 10
+  })
+
+  it('tras un día sin fallos, la escalada vuelve a empezar', async () => {
+    const { attempts, fail, advance } = setup()
+    await fail(4)
+    advance(5 * MIN)
+    await fail(4) // segundo bloqueo: 10 min
+    advance(25 * 60 * MIN)
+    await fail(4)
+    assert.equal(await attempts.remainingLockMs('admin', IP_A), 5 * MIN)
+  })
+
+  it('restablecer la contraseña (clearUser) borra la escalada en todos los equipos', async () => {
+    const { attempts, fail } = setup()
+    await fail(4, IP_A)
+    await fail(4, IP_B)
+    await attempts.clearUser('Admin')
     assert.equal(await attempts.remainingLockMs('admin', IP_A), 0)
+    assert.equal(await attempts.remainingLockMs('admin', IP_B), 0)
+  })
+
+  it('la limpieza diaria conserva los bloqueos vigentes y borra los viejos', async () => {
+    const { attempts, fail, advance } = setup()
+    await fail(4, IP_A, 'viejo')
+    advance(25 * 60 * MIN)
+    await fail(4, IP_A, 'reciente')
+    assert.equal(await attempts.purgeStale(), 1)
+    assert.ok((await attempts.remainingLockMs('reciente', IP_A)) > 0)
   })
 })
