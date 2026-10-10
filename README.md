@@ -148,6 +148,30 @@ Cada integrante tiene su **propia base de datos** en su equipo, así que tu usua
 
 Para cambiar tu contraseña usa el ícono de llave  en la barra superior. Las cuentas que crees desde **Usuarios** reciben una contraseña temporal: la persona debe elegir la suya al entrar por primera vez.
 
+### Datos de prueba (cuenta del profesor y hosts)
+
+Al arrancar en un equipo local, SMRED crea automáticamente lo que falte de estos datos de prueba. En producción (`NODE_ENV=production`) no se crean.
+
+| Usuario | Contraseña inicial | Rol |
+|---|---|---|
+| `profesor` | `Profesor-Smred-2026` | Administrador |
+
+Al primer ingreso el sistema pide elegir una contraseña nueva; desde ahí la contraseña inicial deja de funcionar en ese equipo.
+
+Hosts de prueba: `1.1.1.1` (Cloudflare DNS) y `8.8.8.8` (Google DNS), revisados por ping. Si borras uno, vuelve a aparecer al reiniciar SMRED. Cada equipo mide desde su propia red, así que los valores cambian entre integrantes.
+
+### Qué puede revisar SMRED
+
+Al agregar un equipo, el campo **Qué revisar** define la prueba:
+
+| Revisión | Qué comprueba | Qué muestra |
+|---|---|---|
+| Ping | Que el equipo responda en la red | Latencia, paquetes perdidos y variación (jitter) |
+| SNMP | *Próximamente:* tráfico y estado de routers y switches | — |
+| Agente en el equipo | *Próximamente:* CPU, memoria y disco de los servidores | — |
+
+Cada equipo puede tener su propio umbral de "lento"; si se deja vacío usa el general (`PING_DEGRADED_MS`).
+
 ## 9. Rutina diaria
 
 Para empezar a trabajar:
@@ -243,3 +267,37 @@ Si tu equipo no puede usar Docker:
 | El navegador dice que la conexión no es privada | Ejecuta otra vez `.\scripts\generar-certificado.ps1` y acepta la confirmación de Windows. Usa Chrome o Edge (Firefox necesita pasos extra). |
 | `Cuenta bloqueada temporalmente` | Hubo 4 intentos fallidos desde tu equipo. El primer bloqueo dura 5 minutos, y cada nuevo bloqueo suma 5 más (10, 15...). Espera el tiempo que indica el mensaje, o pide a un administrador que restablezca tu contraseña (eso te desbloquea al instante). |
 | Todos los equipos aparecen *Sin respuesta* | Revisa que el firewall de la red permita ping (ICMP). Prueba con `ping 8.8.8.8` en la terminal. |
+
+## 15. Estructura del proyecto
+
+```
+backend/src/
+├── auth/            inicio de sesión, sesiones, CSRF y bloqueo por intentos fallidos
+├── users/           cuentas de usuario (pantalla Usuarios) y administrador inicial
+├── hosts/           equipos: datos, validación y guardado en la base
+├── monitoring/
+│   ├── checks/      un archivo por tipo de revisión (ping, snmp, agent)
+│   │   └── index.js   lista de tipos de revisión
+│   ├── monitor.service.js         ciclo de revisiones de todos los equipos
+│   ├── status-evaluator.js        reglas de estado: en línea, lento, sin respuesta
+│   ├── stats.js                   estadísticas y series para los gráficos
+│   ├── check-records.repository.js historial de revisiones en la base
+│   └── scheduler.js               cada cuánto se revisa y se limpia el historial
+├── demo/            cuenta del profesor y equipos de prueba
+├── db/migrations/   cambios a la base de datos (nunca edites una ya aplicada)
+└── common/, config/ errores, validación y variables de entorno
+
+frontend/src/features/
+├── auth/            inicio de sesión y cambio de contraseña
+├── users/           pantalla Usuarios
+├── dashboard/       pantalla Inicio
+└── hosts/
+    ├── checks/      textos y campos de cada tipo de revisión
+    ├── detail/      piezas del detalle de un equipo: gráfico, disponibilidad y revisiones
+    ├── HostsPage.jsx, HostDetailPage.jsx, HostForm.jsx
+    └── api.js, types.js, useHostActions.js
+```
+
+Los tests en `backend/tests/` siguen la misma organización.
+
+Para agregar un tipo de revisión: su archivo en `backend/src/monitoring/checks/` (agregarlo a `CHECKS` en `index.js`), una migración que lo permita en `ck_hosts_check_type`, y sus textos y campos en `frontend/src/features/hosts/checks/`. SNMP y el agente ya están registrados con `available: false`.

@@ -5,14 +5,16 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState, ErrorBanner, GlassCard, Loading, StatTile } from '@/components/ui/Feedback'
 import { ChevronIcon, EditIcon, RefreshIcon, TrashIcon } from '@/components/ui/icons'
 import { Modal } from '@/components/ui/Modal'
-import { StatusBadge, StatusPill } from '@/components/ui/Status'
+import { StatusPill } from '@/components/ui/Status'
 import { useIsAdmin } from '@/features/auth/useAuth'
 import { ApiError, errorMessage } from '@/lib/api'
-import { formatDate, formatLatency, formatPercent, formatRelative, formatTime, formatTimeSeconds } from '@/lib/format'
-import { useHost, useHostStats, useLatestPings } from './api'
-import { AvailabilityBar } from './AvailabilityBar'
+import { formatDate, formatLatency, formatPercent, formatRelative, formatTime } from '@/lib/format'
+import { useHost, useHostStats } from './api'
+import { AvailabilityBar } from './detail/AvailabilityBar'
 import { HostForm } from './HostForm'
-import { LatencyChart } from './LatencyChart'
+import { LatencyChart } from './detail/LatencyChart'
+import { RecentChecks } from './detail/RecentChecks'
+import { CHECK_TYPES, isPing } from './checks/check-types'
 import { HOST_TYPE_LABELS } from './types'
 import { useHostActions } from './useHostActions'
 
@@ -27,7 +29,7 @@ function statusSentence(host) {
   if (!host.monitoringEnabled) return 'La revisión automática está pausada.'
   switch (host.status) {
     case 'UP': return `Responde con normalidad${since}.`
-    case 'DEGRADED': return `Responde lento${since}.`
+    case 'DEGRADED': return `Responde con alertas${since}.`
     case 'DOWN': return `No responde${since}.`
     default: return 'Aún no se ha revisado. La primera revisión será en unos segundos.'
   }
@@ -41,7 +43,6 @@ export function HostDetailPage() {
   const [editing, setEditing] = useState(false)
   const host = useHost(id)
   const stats = useHostStats(id, period)
-  const pings = useLatestPings(id, 6)
   const actions = useHostActions({ onDeleted: () => navigate('/hosts', { replace: true }) })
 
   if (host.isPending) return <Loading />
@@ -58,6 +59,45 @@ export function HostDetailPage() {
   const summary = stats.data?.summary
   const threshold = stats.data?.degradedLatencyMs ?? 200
   const current = PERIODS.find((p) => p.key === period)
+  const ping = isPing(h)
+  const showMessage = h.lastMessage && (h.status === 'DOWN' || h.status === 'DEGRADED')
+
+  const tiles = [
+    <StatTile
+      key="availability"
+      label={`Disponible, últimas ${current.label}`}
+      value={formatPercent(summary?.availabilityPct)}
+      tone={summary?.availabilityPct == null ? 'default' : summary.availabilityPct >= 99 ? 'accent' : summary.availabilityPct >= 90 ? 'warning' : 'danger'}
+      note={summary ? `${summary.checks} revisiones` : undefined}
+    />,
+    <StatTile key="avg" label="Respuesta promedio" value={formatLatency(summary?.avgLatencyMs)} />,
+    <StatTile
+      key="max"
+      label="Respuesta más lenta"
+      value={formatLatency(summary?.maxLatencyMs)}
+      tone={(summary?.maxLatencyMs ?? 0) > threshold ? 'warning' : 'default'}
+      note={summary?.maxLatencyAt ? `A las ${formatTime(summary.maxLatencyAt)}` : undefined}
+    />,
+  ]
+  if (ping) {
+    tiles.push(
+      <StatTile key="loss" label="Paquetes perdidos" value={formatPercent(summary?.packetLossPct)} tone={(summary?.packetLossPct ?? 0) > 0 ? 'warning' : 'default'} />,
+      <StatTile key="jitter" label="Variación (jitter)" value={formatLatency(summary?.avgJitterMs)} note="Qué tanto cambia la respuesta entre pings" />,
+    )
+  }
+  const tileColumns = { 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-5' }[tiles.length]
+
+  /** Filas del recuadro Detalles. Las propias de cada tipo de revisión vienen de checks/check-types.jsx. */
+  const details = [
+    ['Qué revisa', CHECK_TYPES[h.checkType].label],
+    ...(CHECK_TYPES[h.checkType].detailRows?.(h) ?? []),
+    ['Lento desde', `${threshold} ms${h.degradedMs ? '' : ' (general)'}`],
+    ['Tipo de equipo', HOST_TYPE_LABELS[h.type]],
+    ['Ubicación', h.location || '—'],
+    ['Revisión automática', h.monitoringEnabled ? 'Activa' : 'Pausada'],
+    ['Última respuesta', formatRelative(h.lastSeenAt)],
+    ['Agregado', formatDate(h.createdAt)],
+  ].filter(Boolean)
 
   return (
     <>
@@ -79,6 +119,7 @@ export function HostDetailPage() {
             <span className="font-mono text-ink">{h.address}</span>, {HOST_TYPE_LABELS[h.type].toLowerCase()}
             {h.location && ` en ${h.location}`}. {statusSentence(h)}
           </p>
+          {showMessage && <p className={`text-[15px] ${h.status === 'DOWN' ? 'text-danger' : 'text-warning'}`}>{h.lastMessage}</p>}
         </div>
         {isAdmin && (
           <div className="flex flex-wrap gap-2">
@@ -95,22 +136,7 @@ export function HostDetailPage() {
         )}
       </header>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile
-          label={`Disponible, últimas ${current.label}`}
-          value={formatPercent(summary?.availabilityPct)}
-          tone={summary?.availabilityPct == null ? 'default' : summary.availabilityPct >= 99 ? 'accent' : summary.availabilityPct >= 90 ? 'warning' : 'danger'}
-          note={summary ? `${summary.checks} revisiones` : undefined}
-        />
-        <StatTile label="Respuesta promedio" value={formatLatency(summary?.avgLatencyMs)} />
-        <StatTile
-          label="Respuesta más lenta"
-          value={formatLatency(summary?.maxLatencyMs)}
-          tone={(summary?.maxLatencyMs ?? 0) > threshold ? 'warning' : 'default'}
-          note={summary?.maxLatencyAt ? `A las ${formatTime(summary.maxLatencyAt)}` : undefined}
-        />
-        <StatTile label="Paquetes perdidos" value={formatPercent(summary?.packetLossPct)} tone={(summary?.packetLossPct ?? 0) > 0 ? 'warning' : 'default'} />
-      </div>
+      <div className={`grid grid-cols-2 gap-4 ${tileColumns}`}>{tiles}</div>
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="flex min-w-0 flex-col gap-6">
@@ -146,45 +172,23 @@ export function HostDetailPage() {
             </div>
             {stats.data && <AvailabilityBar buckets={stats.data.buckets} period={period} />}
           </GlassCard>
-        </div>
 
-        <div className="flex flex-col gap-6">
           <GlassCard>
             <h2 className="text-lg font-semibold">Detalles</h2>
-            <dl className="flex flex-col">
-              {[
-                ['Tipo', HOST_TYPE_LABELS[h.type]],
-                ['Ubicación', h.location || '—'],
-                ['Revisión automática', h.monitoringEnabled ? 'Activa' : 'Pausada'],
-                ['Última respuesta', formatRelative(h.lastSeenAt)],
-                ['Agregado', formatDate(h.createdAt)],
-              ].map(([k, v]) => (
-                <div key={k} className="flex min-h-10 items-center justify-between gap-4 border-t border-line">
-                  <dt className="text-sm text-muted">{k}</dt>
+            {/* Dos columnas en pantallas anchas: aprovecha el ancho bajo los gráficos */}
+            <dl className="grid gap-x-10 sm:grid-cols-2">
+              {details.map(([k, v]) => (
+                <div key={k} className="flex min-h-11 items-center justify-between gap-4 border-t border-line">
+                  <dt className="shrink-0 text-sm text-muted">{k}</dt>
                   <dd className="text-right text-sm">{v}</dd>
                 </div>
               ))}
             </dl>
             {h.description && <p className="text-sm leading-relaxed text-muted">{h.description}</p>}
           </GlassCard>
-
-          <GlassCard>
-            <h2 className="text-lg font-semibold">Últimas revisiones</h2>
-            {pings.data?.length === 0 && <p className="text-sm text-muted">Aún no hay revisiones.</p>}
-            <ul className="flex flex-col">
-              {pings.data?.map((p) => {
-                const status = !p.reachable ? 'DOWN' : (p.latencyMs ?? 0) > threshold || p.packetLossPct > 0 ? 'DEGRADED' : 'UP'
-                return (
-                  <li key={p.checkedAt} className="grid min-h-10 grid-cols-[1fr_1.3fr_0.8fr] items-center gap-2 border-t border-line text-sm">
-                    <span className="font-mono text-muted">{formatTimeSeconds(p.checkedAt)}</span>
-                    <StatusBadge status={status} className="text-[13px]" />
-                    <span className="text-right font-mono">{formatLatency(p.latencyMs)}</span>
-                  </li>
-                )
-              })}
-            </ul>
-          </GlassCard>
         </div>
+
+        <RecentChecks host={h} threshold={threshold} />
       </div>
 
       <Modal open={editing} title="Editar equipo" onClose={() => setEditing(false)}>

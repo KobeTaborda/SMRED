@@ -20,7 +20,7 @@ export function LatencyChart({ buckets, threshold, period }) {
         <LineChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} stroke={colors.line} />
           <XAxis padding={{ left: 8, right: 24 }} dataKey="label" tick={tick} tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={48} />
-          <YAxis tick={tick} tickLine={false} axisLine={false} width={64} domain={[0, Math.ceil(maxValue / 50) * 50]} tickFormatter={(value) => `${value} ms`} />
+          <YAxis tick={tick} tickLine={false} axisLine={false} width={76} domain={[0, Math.ceil(maxValue / 50) * 50]} tickFormatter={(value) => `${value} ms`} />
           <ReferenceLine
             y={threshold}
             stroke={colors.warning}

@@ -6,6 +6,7 @@ import { Sparkline } from '@/components/ui/Sparkline'
 import { StatusBadge } from '@/components/ui/Status'
 import { useIsAdmin } from '@/features/auth/useAuth'
 import { useHosts, useOverview } from '@/features/hosts/api'
+import { isPing } from '@/features/hosts/checks/check-types'
 import { needsAttention, sortByPriority } from '@/features/hosts/types'
 import { useHostActions } from '@/features/hosts/useHostActions'
 import { errorMessage } from '@/lib/api'
@@ -15,11 +16,13 @@ import { formatLatency, formatRelative, formatTime } from '@/lib/format'
 function attentionMessage(host, threshold) {
   if (!host.monitoringEnabled) return 'La revisión automática está pausada.'
   if (host.status === 'DOWN') {
-    return host.statusChangedAt
+    const since = host.statusChangedAt
       ? `No responde desde las ${formatTime(host.statusChangedAt)}, ${formatRelative(host.statusChangedAt)}.`
       : 'No responde.'
+    return host.lastMessage ? `${since} ${host.lastMessage}` : since
   }
   if (host.status === 'DEGRADED') {
+    if (host.lastMessage) return host.lastMessage
     return host.lastLatencyMs > threshold
       ? `Responde lento: ${formatLatency(host.lastLatencyMs)}. Lo normal es menos de ${threshold} ms.`
       : 'Responde, pero se perdieron paquetes en la última revisión.'
@@ -60,7 +63,8 @@ export function DashboardPage() {
   const up = all.filter((h) => h.status === 'UP').length
   const down = all.filter((h) => h.status === 'DOWN').length
   const slow = all.filter((h) => h.status === 'DEGRADED').length
-  const responding = all.filter((h) => h.lastLatencyMs != null && h.status !== 'DOWN')
+  // Solo pings, igual que la tendencia
+  const responding = all.filter((h) => isPing(h) && h.lastLatencyMs != null && h.status !== 'DOWN')
   const avgLatency = responding.length ? responding.reduce((sum, h) => sum + h.lastLatencyMs, 0) / responding.length : null
   const lastCheck = all.map((h) => h.lastCheckedAt).filter(Boolean).sort().at(-1)
 
@@ -87,7 +91,7 @@ export function DashboardPage() {
           tone={down + slow ? 'danger' : 'default'}
           note={down + slow ? `${plural(down, 'sin respuesta', 'sin respuesta')} y ${plural(slow, 'lento', 'lentos')}` : 'Ninguno'}
         />
-        <StatTile label="Tiempo de respuesta" value={formatLatency(avgLatency)}>
+        <StatTile label="Latencia de la red (ping)" value={formatLatency(avgLatency)}>
           <Sparkline values={overview.data?.latencyTrend.map((p) => p.avgLatencyMs) ?? []} height={36} label="Tendencia del tiempo de respuesta en las últimas 2 horas" />
         </StatTile>
       </div>
