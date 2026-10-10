@@ -23,6 +23,14 @@ export const CHECK_TYPES = {
     addressLabel: 'Dirección IP o nombre del equipo',
     placeholder: 'Ej. 192.168.1.1',
   },
+  TCP: {
+    label: 'Que un servicio esté disponible (puerto)',
+    short: 'Puerto',
+    available: true,
+    addressLabel: 'Dirección IP o nombre del equipo',
+    placeholder: 'Ej. 192.168.1.20',
+    detailRows: (host) => [['Puerto', <span key="port" className="font-mono">{host.port}</span>]],
+  },
   SNMP: {
     label: 'Tráfico y estado de un equipo de red (SNMP, próximamente)',
     short: 'SNMP',
@@ -35,8 +43,9 @@ export const CHECK_TYPES = {
   },
 }
 
-/** Resumen corto de la revisión: "Ping". @param {import('../types').Host} host */
-export const checkSummary = (host) => CHECK_TYPES[host.checkType ?? 'PING'].short
+/** Resumen corto de la revisión: "Ping", "Puerto 3389". @param {import('../types').Host} host */
+export const checkSummary = (host) =>
+  host.checkType === 'TCP' ? `Puerto ${host.port}` : CHECK_TYPES[host.checkType ?? 'PING'].short
 
 /** El ping es la única revisión con varios intentos: pérdida y jitter solo tienen sentido ahí. @param {import('../types').Host} host */
 export const isPing = (host) => (host.checkType ?? 'PING') === 'PING'

@@ -14,7 +14,7 @@ describe('evaluateStatus', () => {
 describe('degradedThresholdFor', () => {
   const config = { degradedLatencyMs: 200, httpDegradedLatencyMs: 1000 }
   it('usa el valor propio del equipo si lo tiene', () => assert.equal(degradedThresholdFor({ checkType: 'PING', degradedMs: 50 }, config), 50))
-  it('si no, usa el umbral general', () => assert.equal(degradedThresholdFor({ checkType: 'PING', degradedMs: null }, config), 200))
+  it('el resto usa el umbral del ping', () => assert.equal(degradedThresholdFor({ checkType: 'TCP', degradedMs: null }, config), 200))
 })
 
 describe('isValidHostAddress', () => {

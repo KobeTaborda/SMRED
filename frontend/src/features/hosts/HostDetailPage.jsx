@@ -116,7 +116,8 @@ export function HostDetailPage() {
             <StatusPill status={h.status} />
           </div>
           <p className="text-base text-muted">
-            <span className="font-mono text-ink">{h.address}</span>, {HOST_TYPE_LABELS[h.type].toLowerCase()}
+            <span className="font-mono break-all text-ink">{h.address}</span>
+            {h.checkType === 'TCP' && <>, puerto <span className="font-mono text-ink">{h.port}</span></>}, {HOST_TYPE_LABELS[h.type].toLowerCase()}
             {h.location && ` en ${h.location}`}. {statusSentence(h)}
           </p>
           {showMessage && <p className={`text-[15px] ${h.status === 'DOWN' ? 'text-danger' : 'text-warning'}`}>{h.lastMessage}</p>}

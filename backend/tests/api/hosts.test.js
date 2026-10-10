@@ -81,6 +81,22 @@ describe('API /api/hosts con tipos de revisión', () => {
     admin = await loggedInClient(ctx.app, ADMIN)
   })
 
+  it('pide el puerto en una revisión TCP', async () => {
+    const res = await admin.post('/api/hosts', { name: 'SQL', address: '10.0.0.21', type: 'SERVER', checkType: 'TCP' })
+    assert.equal(res.status, 400)
+    assert.match(res.body.errors.port, /puerto/)
+  })
+
+  it('permite revisar el mismo equipo de varias formas, pero no repetir la misma revisión', async () => {
+    const base = { name: 'Servidor', address: '10.0.0.21', type: 'SERVER' }
+    assert.equal((await admin.post('/api/hosts', base)).status, 201)
+    assert.equal((await admin.post('/api/hosts', { ...base, checkType: 'TCP', port: 3389 })).status, 201)
+    assert.equal((await admin.post('/api/hosts', { ...base, checkType: 'TCP', port: 1433 })).status, 201)
+    const dup = await admin.post('/api/hosts', { ...base, checkType: 'TCP', port: '3389' })
+    assert.equal(dup.status, 409)
+    assert.match(dup.body.detail, /puerto 3389/)
+  })
+
   it('al cambiar lo que se revisa, el estado vuelve a "sin verificar"', async () => {
     const { body: host } = await admin.post('/api/hosts', { name: 'Servidor', address: '10.0.0.21', type: 'SERVER' })
     await admin.post(`/api/hosts/${host.id}/check`)
@@ -88,7 +104,7 @@ describe('API /api/hosts con tipos de revisión', () => {
 
     const renamed = await admin.put(`/api/hosts/${host.id}`, { name: 'Servidor BD', address: '10.0.0.21', type: 'SERVER' })
     assert.equal(renamed.body.status, 'UP') // solo cambió el nombre
-    const changed = await admin.put(`/api/hosts/${host.id}`, { name: 'Servidor BD', address: '10.0.0.22', type: 'SERVER' })
+    const changed = await admin.put(`/api/hosts/${host.id}`, { name: 'Servidor BD', address: '10.0.0.21', type: 'SERVER', checkType: 'TCP', port: 1433 })
     assert.equal(changed.body.status, 'UNKNOWN')
   })
 
@@ -145,4 +161,12 @@ describe('API de estadísticas', () => {
     assert.ok(res.body.latencyTrend.length >= 24 && res.body.latencyTrend.length <= 25)
   })
 
+  it('la tendencia general solo cuenta pings: otro tipo de revisión lento no la distorsiona', async () => {
+    const web = (await admin.post('/api/hosts', { name: 'Servicio', address: '10.0.0.30', type: 'SERVER', checkType: 'TCP', port: 8080 })).body
+    ctx.recordRepository.records.push({ hostId: web.id, reachable: true, latencyMs: 900, packetLossPct: 0, checkedAt: new Date(Date.now() - 30 * 60_000) })
+    const res = await admin.get('/api/overview')
+    const values = res.body.latencyTrend.map((p) => p.avgLatencyMs).filter((v) => v != null)
+    assert.ok(values.length > 0)
+    assert.ok(values.every((v) => v <= 30), `valores: ${values}`)
+  })
 })

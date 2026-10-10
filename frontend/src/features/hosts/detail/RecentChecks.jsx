@@ -4,6 +4,7 @@ import { GlassCard } from '@/components/ui/Feedback'
 import { StatusBadge } from '@/components/ui/Status'
 import { formatLatency, formatPercent, formatTimeSeconds } from '@/lib/format'
 import { useLatestPings } from '../api'
+import { TimingBreakdown } from './TimingBreakdown'
 
 const FIRST_PAGE = 6
 const MAX_PAGE = 30
@@ -36,6 +37,7 @@ function CheckDetail({ record, checkType }) {
           ))}
         </dl>
       )}
+      {checkType !== 'PING' && record.timings && <TimingBreakdown timings={record.timings} totalMs={record.latencyMs} />}
     </div>
   )
 }

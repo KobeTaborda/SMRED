@@ -5,6 +5,7 @@
 import { agentCheck } from './agent.js'
 import { pingCheck } from './ping.js'
 import { snmpCheck } from './snmp.js'
+import { tcpCheck } from './tcp.js'
 
 /**
  * Resultado de cualquier revisión.
@@ -41,7 +42,7 @@ import { snmpCheck } from './snmp.js'
  */
 
 /** @type {CheckDefinition[]} */
-export const CHECKS = [pingCheck, snmpCheck, agentCheck]
+export const CHECKS = [pingCheck, tcpCheck, snmpCheck, agentCheck]
 
 /** Todos los tipos, incluidos los próximos. */
 export const ALL_CHECK_TYPES = CHECKS.map((c) => c.type)

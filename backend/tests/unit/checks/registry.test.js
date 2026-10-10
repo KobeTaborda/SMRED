@@ -8,7 +8,7 @@ describe('Registro de revisiones', () => {
   it('SNMP y Agente están registrados como próximamente y no se ejecutan', () => {
     assert.equal(getCheck('SNMP').available, false)
     assert.equal(getCheck('AGENT').available, false)
-    assert.deepEqual(CHECK_TYPES, ['PING'])
+    assert.deepEqual(CHECK_TYPES, ['PING', 'TCP'])
   })
 
   it('cada revisión disponible define lo necesario para validarse y ejecutarse', () => {
@@ -27,16 +27,15 @@ describe('Registro de revisiones', () => {
   })
 
   it('guarda como null los campos que no usa la revisión elegida', () => {
-    const host = hostSchema.parse({ name: 'Router', address: '10.0.0.1', type: 'ROUTER', port: 1433, keyword: 'TdeA', expectedIp: '1.1.1.1' })
-    assert.equal(host.checkType, 'PING')
-    assert.equal(host.port, null)
+    const host = hostSchema.parse({ name: 'SQL', address: '10.0.0.21', type: 'SERVER', checkType: 'TCP', port: 1433, keyword: 'TdeA', expectedIp: '1.1.1.1' })
+    assert.equal(host.port, 1433)
     assert.equal(host.keyword, null)
     assert.equal(host.expectedIp, null)
   })
 
   it('cada tipo define su umbral de lento', () => {
     const config = { degradedLatencyMs: 200, httpDegradedLatencyMs: 1000 }
-    assert.equal(degradedThresholdFor({ checkType: 'PING' }, config), 200)
+    assert.equal(degradedThresholdFor({ checkType: 'TCP' }, config), 200)
   })
 })
 
@@ -45,12 +44,13 @@ describe('createCheckRunner', () => {
   const fake = (type, result = { reachable: true, avgLatencyMs: 1, packetLossPct: 0 }) => ({
     run: async (host, config) => (calls.push([type, host, config]), result),
   })
-  const runner = createCheckRunner({ runners: { PING: fake('PING') } })
+  const runner = createCheckRunner({ runners: { PING: fake('PING'), TCP: fake('TCP') } })
   const config = { attempts: 3, timeoutMs: 2000, httpTimeoutMs: 10_000 }
 
   it('ejecuta la revisión que corresponde a cada host', async () => {
+    await runner.check({ checkType: 'TCP', address: '10.0.0.5', port: 3389 }, config)
     await runner.check({ address: '8.8.8.8' }, config) // sin tipo = ping
-    assert.deepEqual(calls.map((c) => c[0]), ['PING'])
+    assert.deepEqual(calls.map((c) => c[0]), ['TCP', 'PING'])
   })
 
   it('no ejecuta revisiones próximas', () => {
