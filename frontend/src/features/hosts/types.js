@@ -72,6 +72,17 @@
  * @property {CheckTimings | null} timings
  * @property {number | null} statusCode
  * @property {string | null} message
+ *
+ * @typedef {object} TracerouteHop
+ * @property {number} hop
+ * @property {string | null} address
+ * @property {number | null} latencyMs
+ * @property {number} lostProbes
+ *
+ * @typedef {object} TracerouteResult
+ * @property {string} target
+ * @property {TracerouteHop[]} hops
+ * @property {number} durationMs
  */
 
 /** @type {Record<HostType, string>} */

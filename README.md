@@ -175,6 +175,8 @@ Al agregar un equipo, el campo **Qué revisar** define la prueba:
 
 Cada equipo puede tener su propio umbral de "lento"; si se deja vacío usa el general (`PING_DEGRADED_MS` para ping, puerto y DNS; `HTTP_DEGRADED_MS` para páginas web). Un mismo equipo se puede agregar varias veces con revisiones distintas (por ejemplo, ping y puerto 3389).
 
+En el detalle de cada equipo, el botón **Trazar ruta** muestra por qué routers pasa el tráfico hasta él (solo administradores; tarda hasta un minuto y no se guarda). En Windows usa `tracert`, que viene instalado; en un servidor Linux hay que instalar `traceroute` (`sudo apt install traceroute`).
+
 ## 9. Rutina diaria
 
 Para empezar a trabajar:
@@ -281,6 +283,7 @@ backend/src/
 ├── monitoring/
 │   ├── checks/      un archivo por tipo de revisión (ping, tcp, http, dns, snmp, agent)
 │   │   └── index.js   lista de tipos de revisión
+│   ├── traceroute/  "Trazar ruta": lectura de la salida y ejecución del comando
 │   ├── monitor.service.js         ciclo de revisiones de todos los equipos
 │   ├── status-evaluator.js        reglas de estado: en línea, lento, sin respuesta
 │   ├── stats.js                   estadísticas y series para los gráficos
@@ -296,7 +299,7 @@ frontend/src/features/
 ├── dashboard/       pantalla Inicio
 └── hosts/
     ├── checks/      textos y campos de cada tipo de revisión
-    ├── detail/      piezas del detalle de un equipo: gráfico, disponibilidad y revisiones
+    ├── detail/      piezas del detalle de un equipo: gráfico, disponibilidad, revisiones, ruta
     ├── HostsPage.jsx, HostDetailPage.jsx, HostForm.jsx
     └── api.js, types.js, useHostActions.js
 ```

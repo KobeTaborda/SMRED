@@ -14,6 +14,7 @@ import { createCheckRecordRepository } from './monitoring/check-records.reposito
 import { createCheckRunner } from './monitoring/checks/index.js'
 import { createStatsService } from './monitoring/stats.js'
 import { startScheduler } from './monitoring/scheduler.js'
+import { createTracerouteRunner, createTracerouteService } from './monitoring/traceroute/traceroute.service.js'
 import { seedDemoData } from './demo/demo-seeder.js'
 import { seedInitialAdmin } from './users/admin-seeder.js'
 import { createUserRepository } from './users/user.repository.js'
@@ -57,6 +58,7 @@ async function main() {
     config: config.monitoring,
     logger,
   })
+  const tracerouteService = createTracerouteService({ hostService, runner: createTracerouteRunner(), logger })
   const sessionStore = new SqlSessionStore(db, { ttlMs: config.session.ttlMs, logger })
   const loginAttempts = new LoginAttempts({
     repository: createLoginAttemptRepository(db),
@@ -71,7 +73,7 @@ async function main() {
   await seedDemoData({ userService, hostService, isProduction: config.isProduction, logger })
 
   const app = createApp({
-    config, logger, userRepository, userService, hostService, monitor, statsService, loginAttempts, sessionStore,
+    config, logger, userRepository, userService, hostService, monitor, statsService, tracerouteService, loginAttempts, sessionStore,
   })
   const onListen = (protocol) => () => logger.info(`API escuchando en ${protocol}://localhost:${config.port}`)
   let server

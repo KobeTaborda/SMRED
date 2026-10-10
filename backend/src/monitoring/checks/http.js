@@ -146,6 +146,7 @@ export const httpCheck = {
   isValidAddress: (address) => parseHttpUrl(address) !== null,
   // https://tdea.edu.co y https://tdea.edu.co/ deben contar como la misma dirección
   normalizeAddress: (address) => parseHttpUrl(address).toString(),
+  networkTarget: (host) => parseHttpUrl(host.address)?.hostname.replace(/^\[(.*)\]$/, '$1') ?? '',
   // Una página tarda bastante más que un ping, por eso tiene su propio umbral
   slowThresholdMs: (config) => config.httpDegradedLatencyMs ?? 1000,
   createRunner() {

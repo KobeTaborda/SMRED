@@ -147,6 +147,18 @@ describe('API /api/hosts con tipos de revisión', () => {
     ctx.probe.set('10.0.0.2', { reachable: true, avgLatencyMs: 8, packetLossPct: 0 })
     assert.equal((await admin.post(`/api/hosts/${host.id}/check`)).body.status, 'DEGRADED')
   })
+
+  it('el administrador traza la ruta; un usuario de solo lectura no puede', async () => {
+    const { body: host } = await admin.post('/api/hosts', WEB)
+    const res = await admin.post(`/api/hosts/${host.id}/traceroute`)
+    assert.equal(res.status, 200)
+    assert.equal(res.body.target, 'tdea.edu.co')
+    assert.equal(res.body.hops.length, 2)
+    assert.deepEqual(ctx.tracerouteRunner.calls, ['tdea.edu.co'])
+
+    const viewer = await loggedInClient(ctx.app, VIEWER)
+    assert.equal((await viewer.post(`/api/hosts/${host.id}/traceroute`)).status, 403)
+  })
 })
 
 describe('API de estadísticas', () => {

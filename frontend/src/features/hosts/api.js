@@ -90,3 +90,10 @@ export function useCheckHost() {
     onSuccess: invalidate,
   })
 }
+
+export function useTraceroute() {
+  return useMutation({
+    /** @param {number} id @returns {Promise<import('./types').TracerouteResult>} */
+    mutationFn: (id) => api(`/hosts/${id}/traceroute`, { method: 'POST' }),
+  })
+}

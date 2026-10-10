@@ -2,8 +2,8 @@ import { Router } from 'express'
 import { notFound } from '../common/errors.js'
 import { parseId } from '../common/validate.js'
 
-/** Rutas bajo /api/hosts/:id. POST /check es solo ADMIN (regla de escritura en app.js). */
-export function createMonitoringRouter(monitor, statsService) {
+/** Rutas bajo /api/hosts/:id. Los POST (revisar ahora, trazar ruta) son solo ADMIN (regla de escritura en app.js). */
+export function createMonitoringRouter(monitor, statsService, tracerouteService) {
   const router = Router({ mergeParams: true })
 
   router.param('id', (req, _res, next, value) => {
@@ -22,6 +22,11 @@ export function createMonitoringRouter(monitor, statsService) {
       return res.json(await monitor.latest(req.hostId, Number(req.query.limit)))
     }
     res.json(await monitor.history(req.hostId, Number(req.query.hours ?? 24)))
+  })
+
+  /** Trazado de ruta bajo demanda: puede tardar hasta un minuto y no se guarda. */
+  router.post('/:id/traceroute', async (req, res) => {
+    res.json(await tracerouteService.trace(req.hostId))
   })
 
   router.get('/:id/stats', async (req, res) => {

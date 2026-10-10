@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { CHECK_TYPES, CHECKS, createCheckRunner, getCheck } from '../../../src/monitoring/checks/index.js'
+import { CHECK_TYPES, CHECKS, createCheckRunner, getCheck, networkTargetOf } from '../../../src/monitoring/checks/index.js'
 import { hostSchema } from '../../../src/hosts/host.schemas.js'
 import { degradedThresholdFor } from '../../../src/monitoring/status-evaluator.js'
 
@@ -34,10 +34,12 @@ describe('Registro de revisiones', () => {
     assert.equal(host.expectedIp, null)
   })
 
-  it('cada tipo define su umbral de lento', () => {
+  it('cada tipo define su umbral de lento y su destino para trazar la ruta', () => {
     const config = { degradedLatencyMs: 200, httpDegradedLatencyMs: 1000 }
     assert.equal(degradedThresholdFor({ checkType: 'HTTP' }, config), 1000)
     assert.equal(degradedThresholdFor({ checkType: 'TCP' }, config), 200)
+    assert.equal(networkTargetOf({ checkType: 'HTTP', address: 'https://tdea.edu.co/inicio' }), 'tdea.edu.co')
+    assert.equal(networkTargetOf({ checkType: 'PING', address: '8.8.8.8' }), '8.8.8.8')
   })
 })
 

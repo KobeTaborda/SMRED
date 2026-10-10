@@ -6,8 +6,9 @@ import { createMemoryAttemptRepository, LoginAttempts } from '../../src/auth/log
 import { createHostService } from '../../src/hosts/host.service.js'
 import { createMonitor } from '../../src/monitoring/monitor.service.js'
 import { createStatsService } from '../../src/monitoring/stats.js'
+import { createTracerouteService } from '../../src/monitoring/traceroute/traceroute.service.js'
 import { createUserService } from '../../src/users/user.service.js'
-import { createFakeHostRepository, createFakeRecordRepository, createFakeCheckRunner, createFakeUserRepository } from './fakes.js'
+import { createFakeHostRepository, createFakeRecordRepository, createFakeCheckRunner, createFakeTracerouteRunner, createFakeUserRepository } from './fakes.js'
 import { EventEmitter } from 'node:events'
 
 export const ADMIN = { username: 'admin', password: 'Admin-Password-1', fullName: 'Admin', role: 'ADMIN' }
@@ -32,6 +33,8 @@ export async function createTestApp() {
   const probe = createFakeCheckRunner()
   const monitor = createMonitor({ hostService, recordRepository, probe, config: config.monitoring, logger })
   const statsService = createStatsService({ hostService, recordRepository, config: config.monitoring })
+  const tracerouteRunner = createFakeTracerouteRunner()
+  const tracerouteService = createTracerouteService({ hostService, runner: tracerouteRunner, logger })
   const loginAttempts = new LoginAttempts({
     repository: createMemoryAttemptRepository(),
     maxAttempts: 4,
@@ -45,10 +48,10 @@ export async function createTestApp() {
   await userService.create(VIEWER, { mustChangePassword: false })
 
   const app = createApp({
-    config, logger, userRepository, userService, hostService, monitor, statsService, loginAttempts,
+    config, logger, userRepository, userService, hostService, monitor, statsService, tracerouteService, loginAttempts,
     sessionStore: new session.MemoryStore(),
   })
-  return { app, userService, userRepository, probe, recordRepository, events }
+  return { app, userService, userRepository, probe, recordRepository, events, tracerouteRunner }
 }
 
 /**

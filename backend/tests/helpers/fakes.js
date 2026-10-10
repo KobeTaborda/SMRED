@@ -160,3 +160,15 @@ export function createFakeCheckRunner(defaultResult = { reachable: true, avgLate
     },
   }
 }
+
+/** Traceroute falso: devuelve una salida fija sin ejecutar ningún comando. */
+export function createFakeTracerouteRunner(output = '  1    <1 ms    <1 ms    <1 ms  192.168.1.1\n  2    12 ms    11 ms    13 ms  8.8.8.8\n') {
+  const calls = []
+  return {
+    calls,
+    async run(target) {
+      calls.push(target)
+      return output
+    },
+  }
+}

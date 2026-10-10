@@ -39,6 +39,7 @@ import { tcpCheck } from './tcp.js'
  * @property {string} [addressError]
  * @property {(host: any) => { path: string, message: string }[]} [validate] reglas extra
  * @property {(address: string) => string} [normalizeAddress]
+ * @property {(host: any) => string} [networkTarget] destino del traceroute (por defecto, la dirección)
  * @property {(config: any) => number} [slowThresholdMs] umbral general de "lento"
  * @property {() => { run: (host: any, config: any) => Promise<CheckResult> }} [createRunner]
  */
@@ -61,6 +62,9 @@ export function getCheck(type = 'PING') {
   if (!check) throw new Error(`Tipo de revisión desconocido: ${type}`)
   return check
 }
+
+/** Equipo de red detrás de un host, para el trazado de ruta. */
+export const networkTargetOf = (host) => getCheck(host.checkType).networkTarget?.(host) ?? host.address
 
 /**
  * Ejecuta la revisión que corresponde a cada host.

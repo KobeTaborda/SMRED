@@ -3,17 +3,18 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState, ErrorBanner, GlassCard, Loading, StatTile } from '@/components/ui/Feedback'
-import { ChevronIcon, EditIcon, RefreshIcon, TrashIcon } from '@/components/ui/icons'
+import { ChevronIcon, EditIcon, RefreshIcon, RouteIcon, TrashIcon } from '@/components/ui/icons'
 import { Modal } from '@/components/ui/Modal'
 import { StatusPill } from '@/components/ui/Status'
 import { useIsAdmin } from '@/features/auth/useAuth'
 import { ApiError, errorMessage } from '@/lib/api'
 import { formatDate, formatLatency, formatPercent, formatRelative, formatTime } from '@/lib/format'
-import { useHost, useHostStats } from './api'
+import { useHost, useHostStats, useTraceroute } from './api'
 import { AvailabilityBar } from './detail/AvailabilityBar'
 import { HostForm } from './HostForm'
 import { LatencyChart } from './detail/LatencyChart'
 import { RecentChecks } from './detail/RecentChecks'
+import { TracerouteDialog } from './detail/TracerouteDialog'
 import { CHECK_TYPES, isPing } from './checks/check-types'
 import { HOST_TYPE_LABELS, certificateDaysLeft } from './types'
 import { useHostActions } from './useHostActions'
@@ -49,8 +50,10 @@ export function HostDetailPage() {
   const isAdmin = useIsAdmin()
   const [period, setPeriod] = useState(/** @type {'24h' | '7d'} */ ('24h'))
   const [editing, setEditing] = useState(false)
+  const [tracing, setTracing] = useState(false)
   const host = useHost(id)
   const stats = useHostStats(id, period)
+  const trace = useTraceroute()
   const actions = useHostActions({ onDeleted: () => navigate('/hosts', { replace: true }) })
 
   if (host.isPending) return <Loading />
@@ -72,6 +75,11 @@ export function HostDetailPage() {
   const isHttps = h.checkType === 'HTTP' && h.address.startsWith('https:')
   const certDays = certificateDaysLeft(h.sslExpiresAt)
   const showMessage = h.lastMessage && (h.status === 'DOWN' || h.status === 'DEGRADED')
+
+  function startTrace() {
+    setTracing(true)
+    trace.mutate(h.id)
+  }
 
   const tiles = [
     <StatTile
@@ -152,6 +160,9 @@ export function HostDetailPage() {
             <Button variant="ghost" icon={<EditIcon />} onClick={() => setEditing(true)}>
               Editar
             </Button>
+            <Button variant="ghost" icon={<RouteIcon />} disabled={trace.isPending} onClick={startTrace}>
+              Trazar ruta
+            </Button>
             <Button variant="glass" icon={<RefreshIcon className={`size-[18px] ${actions.isChecking(h.id) ? 'animate-spin' : ''}`} />} disabled={actions.isChecking(h.id)} onClick={() => actions.checkNow(h)}>
               Revisar ahora
             </Button>
@@ -217,6 +228,8 @@ export function HostDetailPage() {
       <Modal open={editing} title="Editar equipo" onClose={() => setEditing(false)}>
         {editing && <HostForm host={h} onDone={() => setEditing(false)} />}
       </Modal>
+
+      <TracerouteDialog open={tracing} trace={trace} onRetry={() => trace.mutate(h.id)} onClose={() => setTracing(false)} />
 
       <ConfirmDialog
         open={actions.toDelete !== null}

@@ -7,7 +7,7 @@ const HOSTNAME =
 /**
  * Acepta IPv4, IPv6 o nombre de host (RFC 1123).
  * Importante para la seguridad: rechaza valores que empiezan con "-", así nadie puede
- * inyectar opciones al comando ping del sistema.
+ * inyectar opciones a los comandos ping y tracert/traceroute del sistema.
  * @param {string} value
  */
 export function isValidHostAddress(value) {
