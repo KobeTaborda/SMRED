@@ -67,6 +67,7 @@ export function createStatsService({ hostService, recordRepository, config, now 
       return {
         period: PERIODS[periodKey] ? periodKey : '24h',
         degradedLatencyMs: threshold,
+        sslWarningDays: config.sslWarningDays ?? 14,
         summary: {
           checks: summary.checks,
           availabilityPct: summary.checks ? round1((summary.ok / summary.checks) * 100) : null,
@@ -88,6 +89,7 @@ export function createStatsService({ hostService, recordRepository, config, now 
       return {
         intervalSeconds: Math.round(config.intervalMs / 1000),
         degradedLatencyMs: config.degradedLatencyMs,
+        httpDegradedLatencyMs: config.httpDegradedLatencyMs ?? 1000,
         latencyTrend: fillBuckets(rows, { since, count, bucketMs, degradedLatencyMs: config.degradedLatencyMs }).map(
           ({ start, avgLatencyMs }) => ({ start, avgLatencyMs }),
         ),

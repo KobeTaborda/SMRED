@@ -3,6 +3,7 @@
  * SNMP y agente están registrados pero deshabilitados (available: false) hasta implementarlos.
  */
 import { agentCheck } from './agent.js'
+import { httpCheck } from './http.js'
 import { pingCheck } from './ping.js'
 import { snmpCheck } from './snmp.js'
 import { tcpCheck } from './tcp.js'
@@ -42,7 +43,7 @@ import { tcpCheck } from './tcp.js'
  */
 
 /** @type {CheckDefinition[]} */
-export const CHECKS = [pingCheck, tcpCheck, snmpCheck, agentCheck]
+export const CHECKS = [pingCheck, tcpCheck, httpCheck, snmpCheck, agentCheck]
 
 /** Todos los tipos, incluidos los próximos. */
 export const ALL_CHECK_TYPES = CHECKS.map((c) => c.type)

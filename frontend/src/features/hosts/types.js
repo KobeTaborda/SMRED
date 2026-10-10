@@ -1,7 +1,7 @@
 /**
  * @typedef {'UNKNOWN' | 'UP' | 'DEGRADED' | 'DOWN'} HostStatus
- * @typedef {'SERVER' | 'ROUTER' | 'SWITCH' | 'FIREWALL' | 'WORKSTATION' | 'OTHER'} HostType
- * @typedef {'PING' | 'TCP' | 'SNMP' | 'AGENT'} CheckType SNMP y AGENT: próximamente
+ * @typedef {'SERVER' | 'ROUTER' | 'SWITCH' | 'FIREWALL' | 'WORKSTATION' | 'WEBSITE' | 'OTHER'} HostType
+ * @typedef {'PING' | 'TCP' | 'HTTP' | 'SNMP' | 'AGENT'} CheckType SNMP y AGENT: próximamente
  *
  * @typedef {object} Host
  * @property {number} id
@@ -51,6 +51,7 @@
  * @typedef {object} HostStats
  * @property {'24h' | '7d'} period
  * @property {number} degradedLatencyMs umbral de "lento" de este equipo
+ * @property {number} sslWarningDays
  * @property {{ checks: number, availabilityPct: number | null, avgLatencyMs: number | null,
  *   maxLatencyMs: number | null, maxLatencyAt: string | null, packetLossPct: number | null,
  *   avgJitterMs: number | null }} summary
@@ -80,10 +81,17 @@ export const HOST_TYPE_LABELS = {
   SWITCH: 'Switch',
   FIREWALL: 'Firewall',
   WORKSTATION: 'Computador o impresora',
+  WEBSITE: 'Sitio web',
   OTHER: 'Otro',
 }
 
 // Los tipos de revisión (textos, campos, filas de detalle) están en checks/check-types.jsx
+
+/** Días que le quedan al certificado SSL (negativo si venció), o null. @param {string | null} expiresAt */
+export function certificateDaysLeft(expiresAt) {
+  if (!expiresAt) return null
+  return Math.floor((new Date(expiresAt).getTime() - Date.now()) / 86_400_000)
+}
 
 /** Palabras simples, entendibles sin saber de redes. @type {Record<HostStatus, string>} */
 export const STATUS_LABELS = {

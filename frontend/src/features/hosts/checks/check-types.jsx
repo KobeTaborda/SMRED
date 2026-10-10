@@ -31,6 +31,17 @@ export const CHECK_TYPES = {
     placeholder: 'Ej. 192.168.1.20',
     detailRows: (host) => [['Puerto', <span key="port" className="font-mono">{host.port}</span>]],
   },
+  HTTP: {
+    label: 'Que una página web funcione (HTTP/HTTPS)',
+    short: 'Web',
+    available: true,
+    addressLabel: 'Dirección de la página',
+    placeholder: 'Ej. https://tdea.edu.co/',
+    detailRows: (host) => [
+      ['Código esperado', host.expectedStatus ?? 'Cualquiera correcto (2xx o 3xx)'],
+      ...(host.keyword ? [['Texto esperado', `"${host.keyword}"`]] : []),
+    ],
+  },
   SNMP: {
     label: 'Tráfico y estado de un equipo de red (SNMP, próximamente)',
     short: 'SNMP',
@@ -43,7 +54,7 @@ export const CHECK_TYPES = {
   },
 }
 
-/** Resumen corto de la revisión: "Ping", "Puerto 3389". @param {import('../types').Host} host */
+/** Resumen corto de la revisión: "Ping", "Puerto 3389", "Web". @param {import('../types').Host} host */
 export const checkSummary = (host) =>
   host.checkType === 'TCP' ? `Puerto ${host.port}` : CHECK_TYPES[host.checkType ?? 'PING'].short
 

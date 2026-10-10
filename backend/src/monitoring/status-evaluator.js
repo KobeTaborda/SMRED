@@ -21,3 +21,26 @@ export function degradedThresholdFor(host, config) {
   if (host.degradedMs) return host.degradedMs
   return getCheck(host.checkType).slowThresholdMs?.(config) ?? config.degradedLatencyMs
 }
+
+const DAY_MS = 86_400_000
+
+/**
+ * Días que le quedan al certificado SSL (negativo si ya venció), o null si no hay certificado.
+ * @param {Date|string|null} expiresAt
+ * @param {Date} now
+ */
+export function certificateDaysLeft(expiresAt, now) {
+  if (!expiresAt) return null
+  return Math.floor((new Date(expiresAt).getTime() - now.getTime()) / DAY_MS)
+}
+
+/**
+ * Avisos que no cambian el estado (por ejemplo, un certificado por vencer).
+ * @param {{ sslExpiresAt?: Date|null }} result
+ * @param {{ sslWarningDays?: number, now: Date }} options
+ */
+export function checkWarnings(result, { sslWarningDays = 14, now }) {
+  const days = certificateDaysLeft(result.sslExpiresAt ?? null, now)
+  if (days == null || days > sslWarningDays) return []
+  return [days <= 0 ? 'El certificado SSL vence hoy.' : `El certificado SSL vence en ${days} ${days === 1 ? 'día' : 'días'}.`]
+}

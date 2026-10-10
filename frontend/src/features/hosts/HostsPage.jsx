@@ -60,7 +60,7 @@ export function HostsPage() {
     <>
       <PageHeader
         title="Equipos"
-        description="Computadores, impresoras, routers y servidores que SMRED revisa automáticamente."
+        description="Computadores, impresoras, routers, servidores y sitios web que SMRED revisa automáticamente."
         actions={
           isAdmin && (
             <Button variant="glass" icon={<PlusIcon />} onClick={() => setEditing({ mode: 'create' })}>

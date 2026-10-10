@@ -13,6 +13,8 @@ export const DEMO_USERS = [
 export const DEMO_HOSTS = [
   { name: 'Cloudflare DNS', address: '1.1.1.1', type: 'SERVER', checkType: 'PING', description: 'Host de prueba: DNS público de Cloudflare' },
   { name: 'Google DNS', address: '8.8.8.8', type: 'SERVER', checkType: 'PING', description: 'Host de prueba: DNS público de Google' },
+  // Por web y no por ping: el sitio puede bloquear el ping
+  { name: 'TdeA', address: 'https://tdea.edu.co/', type: 'WEBSITE', checkType: 'HTTP', description: 'Host de prueba: sitio web institucional' },
 ]
 
 /** Identifica una revisión: el mismo equipo puede revisarse de varias formas. */

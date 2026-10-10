@@ -53,6 +53,9 @@ const envSchema = z.object({
   PING_DEGRADED_MS: z.coerce.number().positive().default(200),
   PING_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(20),
   PING_RETENTION_DAYS: z.coerce.number().int().min(1).default(7),
+  HTTP_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10000),
+  HTTP_DEGRADED_MS: z.coerce.number().positive().default(1000),
+  SSL_WARNING_DAYS: z.coerce.number().int().min(1).default(14),
 
   // HTTPS: si existen estos dos archivos, el servidor usa HTTPS (ver scripts/generar-certificado.ps1)
   SSL_CERT_FILE: z.string().optional(),
@@ -121,6 +124,9 @@ export function loadConfig() {
       degradedLatencyMs: env.PING_DEGRADED_MS,
       maxConcurrency: env.PING_MAX_CONCURRENCY,
       retentionDays: env.PING_RETENTION_DAYS,
+      httpTimeoutMs: env.HTTP_TIMEOUT_MS,
+      httpDegradedLatencyMs: env.HTTP_DEGRADED_MS,
+      sslWarningDays: env.SSL_WARNING_DAYS,
       cleanupCron: '0 3 * * *',
     },
     https: httpsConfig(env),

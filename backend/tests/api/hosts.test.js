@@ -81,6 +81,17 @@ describe('API /api/hosts con tipos de revisión', () => {
     admin = await loggedInClient(ctx.app, ADMIN)
   })
 
+  const WEB = { name: 'TdeA', address: 'https://TDEA.edu.co', type: 'WEBSITE', checkType: 'HTTP', keyword: 'Bienvenidos' }
+
+  it('crea una revisión web y normaliza la URL', async () => {
+    const res = await admin.post('/api/hosts', WEB)
+    assert.equal(res.status, 201)
+    assert.equal(res.body.address, 'https://tdea.edu.co/')
+    assert.equal(res.body.checkType, 'HTTP')
+    assert.equal(res.body.keyword, 'Bienvenidos')
+    assert.equal(res.body.port, null)
+  })
+
   it('pide el puerto en una revisión TCP', async () => {
     const res = await admin.post('/api/hosts', { name: 'SQL', address: '10.0.0.21', type: 'SERVER', checkType: 'TCP' })
     assert.equal(res.status, 400)
@@ -106,6 +117,29 @@ describe('API /api/hosts con tipos de revisión', () => {
     assert.equal(renamed.body.status, 'UP') // solo cambió el nombre
     const changed = await admin.put(`/api/hosts/${host.id}`, { name: 'Servidor BD', address: '10.0.0.21', type: 'SERVER', checkType: 'TCP', port: 1433 })
     assert.equal(changed.body.status, 'UNKNOWN')
+  })
+
+  it('guarda el mensaje, el código y el desglose de tiempos de una revisión web', async () => {
+    const { body: host } = await admin.post('/api/hosts', WEB)
+    const timings = { dnsMs: 12, connectMs: 30, tlsMs: 45, ttfbMs: 210 }
+    ctx.probe.set('https://tdea.edu.co/', {
+      reachable: true, avgLatencyMs: 320, packetLossPct: 0, statusCode: 200, timings, message: '200 OK.',
+      sslExpiresAt: new Date(Date.now() + 5 * 86_400_000),
+    })
+    const check = await admin.post(`/api/hosts/${host.id}/check`)
+    assert.equal(check.body.status, 'UP') // 320 ms está bajo el umbral web
+    assert.match(check.body.message, /200 OK\. El certificado SSL vence en [45] días\./)
+
+    const detail = (await admin.get(`/api/hosts/${host.id}`)).body
+    assert.ok(detail.sslExpiresAt)
+    assert.match(detail.lastMessage, /certificado/)
+
+    const [last] = (await admin.get(`/api/hosts/${host.id}/pings?limit=1`)).body
+    assert.deepEqual(last.timings, timings)
+    assert.equal(last.statusCode, 200)
+
+    const stats = (await admin.get(`/api/hosts/${host.id}/stats`)).body
+    assert.equal(stats.degradedLatencyMs, 1000)
   })
 
   it('el umbral propio del equipo manda sobre el general', async () => {
@@ -161,8 +195,8 @@ describe('API de estadísticas', () => {
     assert.ok(res.body.latencyTrend.length >= 24 && res.body.latencyTrend.length <= 25)
   })
 
-  it('la tendencia general solo cuenta pings: otro tipo de revisión lento no la distorsiona', async () => {
-    const web = (await admin.post('/api/hosts', { name: 'Servicio', address: '10.0.0.30', type: 'SERVER', checkType: 'TCP', port: 8080 })).body
+  it('la tendencia general solo cuenta pings: una página web lenta no la distorsiona', async () => {
+    const web = (await admin.post('/api/hosts', { name: 'Sitio', address: 'https://ejemplo.edu.co/', type: 'WEBSITE', checkType: 'HTTP' })).body
     ctx.recordRepository.records.push({ hostId: web.id, reachable: true, latencyMs: 900, packetLossPct: 0, checkedAt: new Date(Date.now() - 30 * 60_000) })
     const res = await admin.get('/api/overview')
     const values = res.body.latencyTrend.map((p) => p.avgLatencyMs).filter((v) => v != null)

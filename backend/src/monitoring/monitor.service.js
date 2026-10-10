@@ -1,5 +1,5 @@
 import pLimit from 'p-limit'
-import { degradedThresholdFor, evaluateStatus } from './status-evaluator.js'
+import { checkWarnings, degradedThresholdFor, evaluateStatus } from './status-evaluator.js'
 
 const DAY_MS = 86_400_000
 
@@ -15,9 +15,9 @@ export function createMonitor({ hostService, recordRepository, probe, config, lo
     const threshold = degradedThresholdFor(host, config)
     const status = evaluateStatus(result, threshold)
     const checkedAt = now()
-    const warnings = []
+    const warnings = checkWarnings(result, { sslWarningDays: config.sslWarningDays, now: checkedAt })
     if (result.reachable && result.avgLatencyMs > threshold) {
-      warnings.push(`Respuesta lenta: ${Math.round(result.avgLatencyMs)} ms (lo normal es menos de ${threshold} ms).`)
+      warnings.unshift(`Respuesta lenta: ${Math.round(result.avgLatencyMs)} ms (lo normal es menos de ${threshold} ms).`)
     }
     const message = [result.message, ...warnings].filter(Boolean).join(' ').slice(0, MAX_MESSAGE) || null
     const record = toRecord(result, message)

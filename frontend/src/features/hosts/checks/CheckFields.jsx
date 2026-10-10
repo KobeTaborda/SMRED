@@ -35,8 +35,36 @@ function TcpFields({ form, errors, update }) {
   )
 }
 
+/** @param {FieldsProps} props */
+function HttpFields({ form, errors, update }) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+      <TextField
+        label="Código esperado"
+        type="number"
+        min={100}
+        max={599}
+        inputMode="numeric"
+        placeholder="200"
+        className="font-mono"
+        value={form.expectedStatus}
+        error={errors.expectedStatus}
+        onChange={(e) => update('expectedStatus', e.target.value)}
+      />
+      <TextField
+        label="Texto que debe aparecer"
+        placeholder="Ej. Bienvenidos"
+        hint="Opcional. Si la página no lo contiene, se marca sin respuesta."
+        value={form.keyword}
+        error={errors.keyword}
+        onChange={(e) => update('keyword', e.target.value)}
+      />
+    </div>
+  )
+}
+
 /** @type {Partial<Record<import('../types').CheckType, (props: FieldsProps) => import('react').ReactNode>>} */
-const FIELDS = { TCP: TcpFields }
+const FIELDS = { TCP: TcpFields, HTTP: HttpFields }
 
 /** Campos del tipo de revisión elegido (nada si el tipo no tiene campos propios). @param {FieldsProps & { checkType: string }} props */
 export function CheckFields({ checkType, ...props }) {

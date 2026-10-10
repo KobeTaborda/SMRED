@@ -52,7 +52,7 @@ export function useLatestPings(id, limit = 6) {
 export function useOverview() {
   return useQuery({
     queryKey: ['overview'],
-    /** @returns {Promise<{ intervalSeconds: number, degradedLatencyMs: number, latencyTrend: { start: string, avgLatencyMs: number | null }[] }>} */
+    /** @returns {Promise<{ intervalSeconds: number, degradedLatencyMs: number, httpDegradedLatencyMs: number, latencyTrend: { start: string, avgLatencyMs: number | null }[] }>} */
     queryFn: () => api('/overview'),
     refetchInterval: 60_000,
   })

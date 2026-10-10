@@ -15,7 +15,7 @@ import { HostForm } from './HostForm'
 import { LatencyChart } from './detail/LatencyChart'
 import { RecentChecks } from './detail/RecentChecks'
 import { CHECK_TYPES, isPing } from './checks/check-types'
-import { HOST_TYPE_LABELS } from './types'
+import { HOST_TYPE_LABELS, certificateDaysLeft } from './types'
 import { useHostActions } from './useHostActions'
 
 const PERIODS = [
@@ -33,6 +33,14 @@ function statusSentence(host) {
     case 'DOWN': return `No responde${since}.`
     default: return 'Aún no se ha revisado. La primera revisión será en unos segundos.'
   }
+}
+
+/** "74 días", "vence hoy", "venció". @param {number | null} days */
+function certificateLabel(days) {
+  if (days == null) return '—'
+  if (days < 0) return 'Vencido'
+  if (days === 0) return 'Vence hoy'
+  return `${days} ${days === 1 ? 'día' : 'días'}`
 }
 
 export function HostDetailPage() {
@@ -58,8 +66,11 @@ export function HostDetailPage() {
   const h = host.data
   const summary = stats.data?.summary
   const threshold = stats.data?.degradedLatencyMs ?? 200
+  const warningDays = stats.data?.sslWarningDays ?? 14
   const current = PERIODS.find((p) => p.key === period)
   const ping = isPing(h)
+  const isHttps = h.checkType === 'HTTP' && h.address.startsWith('https:')
+  const certDays = certificateDaysLeft(h.sslExpiresAt)
   const showMessage = h.lastMessage && (h.status === 'DOWN' || h.status === 'DEGRADED')
 
   const tiles = [
@@ -83,6 +94,17 @@ export function HostDetailPage() {
     tiles.push(
       <StatTile key="loss" label="Paquetes perdidos" value={formatPercent(summary?.packetLossPct)} tone={(summary?.packetLossPct ?? 0) > 0 ? 'warning' : 'default'} />,
       <StatTile key="jitter" label="Variación (jitter)" value={formatLatency(summary?.avgJitterMs)} note="Qué tanto cambia la respuesta entre pings" />,
+    )
+  }
+  if (h.checkType === 'HTTP') {
+    tiles.push(
+      <StatTile
+        key="ssl"
+        label="Certificado SSL"
+        value={isHttps ? certificateLabel(certDays) : 'Sin HTTPS'}
+        tone={!isHttps ? 'warning' : certDays == null ? 'default' : certDays <= 0 ? 'danger' : certDays <= warningDays ? 'warning' : 'default'}
+        note={isHttps && h.sslExpiresAt ? `Vence el ${formatDate(h.sslExpiresAt)}` : undefined}
+      />,
     )
   }
   const tileColumns = { 3: 'lg:grid-cols-3', 4: 'lg:grid-cols-4', 5: 'lg:grid-cols-5' }[tiles.length]

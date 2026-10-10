@@ -39,7 +39,17 @@ export function HostForm({ host, onDone }) {
   const generalError = save.error && Object.keys(fieldErrors).length === 0 ? errorMessage(save.error) : null
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
   const check = CHECK_TYPES[form.checkType]
-  const defaultSlowMs = overview.data?.degradedLatencyMs ?? 200
+  const defaultSlowMs = form.checkType === 'HTTP' ? (overview.data?.httpDegradedLatencyMs ?? 1000) : (overview.data?.degradedLatencyMs ?? 200)
+
+  // En un equipo nuevo, la revisión web propone el tipo Sitio web
+  function changeCheckType(checkType) {
+    setForm((current) => {
+      let type = current.type
+      if (!host && checkType === 'HTTP' && type === 'SERVER') type = 'WEBSITE'
+      else if (!host && current.checkType === 'HTTP' && checkType !== 'HTTP' && type === 'WEBSITE') type = 'SERVER'
+      return { ...current, checkType, type }
+    })
+  }
 
   function handleSubmit(event) {
     event.preventDefault()
@@ -59,7 +69,7 @@ export function HostForm({ host, onDone }) {
       {generalError && <ErrorBanner message={generalError} />}
       <TextField label="Nombre" required placeholder="Ej. Router principal" value={form.name} error={fieldErrors.name} onChange={(e) => update('name', e.target.value)} />
 
-      <SelectField label="Qué revisar" value={form.checkType} error={fieldErrors.checkType} onChange={(e) => update('checkType', e.target.value)}>
+      <SelectField label="Qué revisar" value={form.checkType} error={fieldErrors.checkType} onChange={(e) => changeCheckType(e.target.value)}>
         {Object.entries(CHECK_TYPES).map(([value, { label, available }]) => (
           <option key={value} value={value} disabled={!available}>
             {label}
@@ -72,6 +82,7 @@ export function HostForm({ host, onDone }) {
         required
         placeholder={check.placeholder}
         className="font-mono"
+        inputMode={form.checkType === 'HTTP' ? 'url' : undefined}
         value={form.address}
         error={fieldErrors.address}
         onChange={(e) => update('address', e.target.value)}
@@ -96,7 +107,7 @@ export function HostForm({ host, onDone }) {
         max={60000}
         inputMode="numeric"
         placeholder={String(defaultSlowMs)}
-        hint={`Vacío: ${defaultSlowMs} ms, el valor general.`}
+        hint={`Vacío: ${defaultSlowMs} ms, el valor general para ${form.checkType === 'HTTP' ? 'páginas web' : 'esta revisión'}.`}
         className="font-mono"
         value={form.degradedMs}
         error={fieldErrors.degradedMs}

@@ -1,6 +1,6 @@
 import { toIso } from '../common/mappers.js'
 
-export const HOST_TYPES = /** @type {const} */ (['SERVER', 'ROUTER', 'SWITCH', 'FIREWALL', 'WORKSTATION', 'OTHER'])
+export const HOST_TYPES = /** @type {const} */ (['SERVER', 'ROUTER', 'SWITCH', 'FIREWALL', 'WORKSTATION', 'WEBSITE', 'OTHER'])
 export const HOST_STATUSES = /** @type {const} */ (['UNKNOWN', 'UP', 'DEGRADED', 'DOWN'])
 
 // Los tipos de revisión (checkType) se definen en monitoring/checks/index.js
