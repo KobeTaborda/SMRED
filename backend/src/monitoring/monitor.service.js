@@ -1,23 +1,37 @@
 import pLimit from 'p-limit'
-import { evaluateStatus } from './status-evaluator.js'
+import { degradedThresholdFor, evaluateStatus } from './status-evaluator.js'
 
 const DAY_MS = 86_400_000
 
+const MAX_MESSAGE = 300 // tamaño de la columna message / last_message
+
 /**
- * Orquesta las verificaciones por ping.
- * Node atiende muchos pings a la vez sin hilos extra (E/S asíncrona); p-limit solo evita
- * lanzar cientos de procesos ping simultáneos si hay muchos hosts.
+ * Ejecuta las revisiones de todos los hosts. p-limit evita lanzar demasiadas a la vez.
+ * @param {{ probe: { check: (host: any, config: any) => Promise<import('./checks/index.js').CheckResult> } } & Record<string, any>} deps
  */
 export function createMonitor({ hostService, recordRepository, probe, config, logger, now = () => new Date() }) {
   async function check(host) {
-    const result = await probe.ping(host.address, { attempts: config.attempts, timeoutMs: config.timeoutMs })
-    const status = evaluateStatus(result, config.degradedLatencyMs)
+    const result = await probe.check(host, config)
+    const threshold = degradedThresholdFor(host, config)
+    const status = evaluateStatus(result, threshold)
     const checkedAt = now()
+    const warnings = []
+    if (result.reachable && result.avgLatencyMs > threshold) {
+      warnings.push(`Respuesta lenta: ${Math.round(result.avgLatencyMs)} ms (lo normal es menos de ${threshold} ms).`)
+    }
+    const message = [result.message, ...warnings].filter(Boolean).join(' ').slice(0, MAX_MESSAGE) || null
+    const record = toRecord(result, message)
 
-    await recordRepository.insert({ hostId: host.id, ...pickResult(result), checkedAt })
-    await hostService.recordCheck(host.id, { status, latencyMs: result.avgLatencyMs, checkedAt })
+    await recordRepository.insert({ hostId: host.id, ...record, checkedAt })
+    await hostService.recordCheck(host.id, {
+      status,
+      latencyMs: result.avgLatencyMs,
+      message,
+      sslExpiresAt: result.sslExpiresAt ?? null,
+      checkedAt,
+    })
 
-    return { hostId: host.id, status, ...pickResult(result), checkedAt: checkedAt.toISOString() }
+    return { hostId: host.id, status, ...record, checkedAt: checkedAt.toISOString() }
   }
 
   return {
@@ -34,7 +48,7 @@ export function createMonitor({ hostService, recordRepository, probe, config, lo
           logger.warn({ err: result.reason, host: hosts[i].address }, 'Falló la verificación de un host')
         }
       })
-      logger.debug({ hosts: hosts.length, ms: Date.now() - started }, 'Ciclo de ping completado')
+      logger.debug({ hosts: hosts.length, ms: Date.now() - started }, 'Ciclo de revisiones completado')
     },
 
     /** Verificación manual (botón "Verificar"). */
@@ -62,4 +76,13 @@ export function createMonitor({ hostService, recordRepository, probe, config, lo
 /** Entre 1 hora y 7 días; 24 h por defecto. */
 const clampHours = (hours) => Math.min(Math.max(Math.trunc(hours) || 24, 1), 168)
 
-const pickResult = ({ reachable, avgLatencyMs, packetLossPct }) => ({ reachable, latencyMs: avgLatencyMs, packetLossPct })
+/** Lo que se guarda en el historial de cada revisión. */
+const toRecord = (result, message) => ({
+  reachable: result.reachable,
+  latencyMs: result.avgLatencyMs,
+  packetLossPct: result.packetLossPct,
+  jitterMs: result.jitterMs ?? null,
+  timings: result.timings ?? null,
+  statusCode: result.statusCode ?? null,
+  message,
+})

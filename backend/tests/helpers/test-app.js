@@ -7,7 +7,7 @@ import { createHostService } from '../../src/hosts/host.service.js'
 import { createMonitor } from '../../src/monitoring/monitor.service.js'
 import { createStatsService } from '../../src/monitoring/stats.js'
 import { createUserService } from '../../src/users/user.service.js'
-import { createFakeHostRepository, createFakeRecordRepository, createFakeProbe, createFakeUserRepository } from './fakes.js'
+import { createFakeHostRepository, createFakeRecordRepository, createFakeCheckRunner, createFakeUserRepository } from './fakes.js'
 import { EventEmitter } from 'node:events'
 
 export const ADMIN = { username: 'admin', password: 'Admin-Password-1', fullName: 'Admin', role: 'ADMIN' }
@@ -29,7 +29,7 @@ export async function createTestApp() {
   const events = new EventEmitter()
   const hostService = createHostService(createFakeHostRepository(), { logger, events })
   const recordRepository = createFakeRecordRepository()
-  const probe = createFakeProbe()
+  const probe = createFakeCheckRunner()
   const monitor = createMonitor({ hostService, recordRepository, probe, config: config.monitoring, logger })
   const statsService = createStatsService({ hostService, recordRepository, config: config.monitoring })
   const loginAttempts = new LoginAttempts({

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { parsePingOutput, pingArgs } from '../../../src/monitoring/checks/ping.js'
+import { jitterOf, parsePingOutput, pingArgs, pingMessage } from '../../../src/monitoring/checks/ping.js'
 
 const WINDOWS_ES = `
 Haciendo ping a 8.8.8.8 con 32 bytes de datos:
@@ -35,24 +35,30 @@ PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.
 
 describe('parsePingOutput', () => {
   it('interpreta Windows en español', () => {
-    assert.deepEqual(parsePingOutput(WINDOWS_ES, 3), { reachable: true, avgLatencyMs: 16, packetLossPct: 0 })
+    assert.deepEqual(parsePingOutput(WINDOWS_ES, 3), { reachable: true, avgLatencyMs: 16, packetLossPct: 0, jitterMs: 1.5 })
   })
 
   it('interpreta pérdida parcial y "time<1ms" en Windows en inglés', () => {
-    assert.deepEqual(parsePingOutput(WINDOWS_EN_PARTIAL, 3), { reachable: true, avgLatencyMs: 1.5, packetLossPct: 33 })
+    assert.deepEqual(parsePingOutput(WINDOWS_EN_PARTIAL, 3), { reachable: true, avgLatencyMs: 1.5, packetLossPct: 33, jitterMs: 1 })
   })
 
   it('no confunde "Host de destino inaccesible" con una respuesta real', () => {
-    assert.deepEqual(parsePingOutput(WINDOWS_ES_UNREACHABLE, 3), { reachable: false, avgLatencyMs: null, packetLossPct: 100 })
+    assert.deepEqual(parsePingOutput(WINDOWS_ES_UNREACHABLE, 3), { reachable: false, avgLatencyMs: null, packetLossPct: 100, jitterMs: null })
   })
 
   it('interpreta Linux con decimales', () => {
-    assert.deepEqual(parsePingOutput(LINUX, 3), { reachable: true, avgLatencyMs: 11.4, packetLossPct: 0 })
+    assert.deepEqual(parsePingOutput(LINUX, 3), { reachable: true, avgLatencyMs: 11.4, packetLossPct: 0, jitterMs: 0.9 })
   })
 
   it('salida vacía = inalcanzable', () => {
     assert.equal(parsePingOutput('', 3).reachable, false)
   })
+})
+
+describe('jitterOf', () => {
+  it('promedia la diferencia entre respuestas seguidas', () => assert.equal(jitterOf([10, 12, 11]), 1.5))
+  it('es 0 si la latencia no varía', () => assert.equal(jitterOf([5, 5, 5]), 0))
+  it('necesita al menos dos respuestas', () => assert.equal(jitterOf([10]), null))
 })
 
 describe('pingArgs', () => {
@@ -62,5 +68,13 @@ describe('pingArgs', () => {
 
   it('usa -c y -W (segundos) en Linux', () => {
     assert.deepEqual(pingArgs('8.8.8.8', { attempts: 3, timeoutMs: 2000, platform: 'linux' }), ['-c', '3', '-W', '2', '8.8.8.8'])
+  })
+})
+
+describe('pingMessage', () => {
+  it('explica el resultado en palabras', () => {
+    assert.equal(pingMessage({ reachable: true, packetLossPct: 0 }, 3), 'Respondió a los 3 pings.')
+    assert.equal(pingMessage({ reachable: true, packetLossPct: 33 }, 3), 'Se perdieron 1 de 3 pings.')
+    assert.equal(pingMessage({ reachable: false, packetLossPct: 100 }, 3), 'No respondió a ninguno de los 3 pings.')
   })
 })

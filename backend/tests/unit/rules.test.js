@@ -2,13 +2,19 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { createMemoryAttemptRepository, LoginAttempts } from '../../src/auth/login-attempts.js'
 import { isValidHostAddress } from '../../src/hosts/host-address.js'
-import { evaluateStatus } from '../../src/monitoring/status-evaluator.js'
+import { degradedThresholdFor, evaluateStatus } from '../../src/monitoring/status-evaluator.js'
 
 describe('evaluateStatus', () => {
   it('DOWN si no responde', () => assert.equal(evaluateStatus({ reachable: false, avgLatencyMs: null, packetLossPct: 100 }, 200), 'DOWN'))
   it('UP si responde rápido y sin pérdida', () => assert.equal(evaluateStatus({ reachable: true, avgLatencyMs: 12, packetLossPct: 0 }, 200), 'UP'))
   it('DEGRADED si la latencia supera el umbral', () => assert.equal(evaluateStatus({ reachable: true, avgLatencyMs: 350, packetLossPct: 0 }, 200), 'DEGRADED'))
   it('DEGRADED si hay pérdida parcial', () => assert.equal(evaluateStatus({ reachable: true, avgLatencyMs: 20, packetLossPct: 33 }, 200), 'DEGRADED'))
+})
+
+describe('degradedThresholdFor', () => {
+  const config = { degradedLatencyMs: 200, httpDegradedLatencyMs: 1000 }
+  it('usa el valor propio del equipo si lo tiene', () => assert.equal(degradedThresholdFor({ checkType: 'PING', degradedMs: 50 }, config), 50))
+  it('si no, usa el umbral general', () => assert.equal(degradedThresholdFor({ checkType: 'PING', degradedMs: null }, config), 200))
 })
 
 describe('isValidHostAddress', () => {

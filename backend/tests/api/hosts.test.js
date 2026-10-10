@@ -58,6 +58,7 @@ describe('API /api/hosts', () => {
     const check = await admin.post(`/api/hosts/${host.id}/check`)
     assert.equal(check.status, 200)
     assert.equal(check.body.status, 'DEGRADED')
+    assert.match(check.body.message, /Respuesta lenta: 350 ms \(lo normal es menos de 200 ms\)/)
 
     const detail = await admin.get(`/api/hosts/${host.id}`)
     assert.equal(detail.body.status, 'DEGRADED')
@@ -70,6 +71,31 @@ describe('API /api/hosts', () => {
 
   it('responde 404 con ids inválidos', async () => {
     assert.equal((await admin.get('/api/hosts/abc')).status, 404)
+  })
+})
+
+describe('API /api/hosts con tipos de revisión', () => {
+  let ctx, admin
+  beforeEach(async () => {
+    ctx = await createTestApp()
+    admin = await loggedInClient(ctx.app, ADMIN)
+  })
+
+  it('al cambiar lo que se revisa, el estado vuelve a "sin verificar"', async () => {
+    const { body: host } = await admin.post('/api/hosts', { name: 'Servidor', address: '10.0.0.21', type: 'SERVER' })
+    await admin.post(`/api/hosts/${host.id}/check`)
+    assert.equal((await admin.get(`/api/hosts/${host.id}`)).body.status, 'UP')
+
+    const renamed = await admin.put(`/api/hosts/${host.id}`, { name: 'Servidor BD', address: '10.0.0.21', type: 'SERVER' })
+    assert.equal(renamed.body.status, 'UP') // solo cambió el nombre
+    const changed = await admin.put(`/api/hosts/${host.id}`, { name: 'Servidor BD', address: '10.0.0.22', type: 'SERVER' })
+    assert.equal(changed.body.status, 'UNKNOWN')
+  })
+
+  it('el umbral propio del equipo manda sobre el general', async () => {
+    const { body: host } = await admin.post('/api/hosts', { name: 'Switch', address: '10.0.0.2', type: 'SWITCH', degradedMs: 5 })
+    ctx.probe.set('10.0.0.2', { reachable: true, avgLatencyMs: 8, packetLossPct: 0 })
+    assert.equal((await admin.post(`/api/hosts/${host.id}/check`)).body.status, 'DEGRADED')
   })
 })
 
@@ -94,7 +120,7 @@ describe('API de estadísticas', () => {
     assert.equal(res.body.degradedLatencyMs, 200)
     assert.deepEqual(
       { ...res.body.summary, maxLatencyAt: undefined },
-      { checks: 4, availabilityPct: 75, avgLatencyMs: 20, maxLatencyMs: 30, maxLatencyAt: undefined, packetLossPct: 25 },
+      { checks: 4, availabilityPct: 75, avgLatencyMs: 20, maxLatencyMs: 30, maxLatencyAt: undefined, packetLossPct: 25, avgJitterMs: null },
     )
     assert.ok(res.body.buckets.length >= 48)
     assert.ok(res.body.buckets.some((b) => b.checks > 0))
@@ -118,4 +144,5 @@ describe('API de estadísticas', () => {
     assert.equal(res.body.intervalSeconds, 30)
     assert.ok(res.body.latencyTrend.length >= 24 && res.body.latencyTrend.length <= 25)
   })
+
 })

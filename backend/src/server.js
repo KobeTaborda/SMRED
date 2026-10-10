@@ -10,8 +10,8 @@ import { createDb } from './db/knex.js'
 import { createHostRepository } from './hosts/host.repository.js'
 import { createHostService } from './hosts/host.service.js'
 import { createMonitor } from './monitoring/monitor.service.js'
-import { createPingProbe } from './monitoring/checks/ping.js'
 import { createCheckRecordRepository } from './monitoring/check-records.repository.js'
+import { createCheckRunner } from './monitoring/checks/index.js'
 import { createStatsService } from './monitoring/stats.js'
 import { startScheduler } from './monitoring/scheduler.js'
 import { seedInitialAdmin } from './users/admin-seeder.js'
@@ -52,7 +52,7 @@ async function main() {
   const monitor = createMonitor({
     hostService,
     recordRepository,
-    probe: createPingProbe(),
+    probe: createCheckRunner(),
     config: config.monitoring,
     logger,
   })
@@ -67,7 +67,9 @@ async function main() {
 
   await seedInitialAdmin({ userService, seedAdmin: config.seedAdmin, logger })
 
-  const app = createApp({ config, logger, userRepository, userService, hostService, monitor, statsService, loginAttempts, sessionStore })
+  const app = createApp({
+    config, logger, userRepository, userService, hostService, monitor, statsService, loginAttempts, sessionStore,
+  })
   const onListen = (protocol) => () => logger.info(`API escuchando en ${protocol}://localhost:${config.port}`)
   let server
   if (config.https.enabled) {
