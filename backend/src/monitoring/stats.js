@@ -1,6 +1,6 @@
 /**
  * Estadísticas para la vista de detalle y el panel de inicio.
- * La agregación pesada la hace SQL Server (ping.repository); aquí solo se arman las series.
+ * La agregación pesada la hace SQL Server (check-records.repository); aquí solo se arman las series.
  */
 
 export const PERIODS = {
@@ -49,7 +49,7 @@ export function fillBuckets(rows, { since, count, bucketMs, degradedLatencyMs })
   })
 }
 
-export function createStatsService({ hostService, pingRepository, config, now = () => new Date() }) {
+export function createStatsService({ hostService, recordRepository, config, now = () => new Date() }) {
   return {
     async hostStats(hostId, periodKey) {
       await hostService.get(hostId) // 404 si no existe
@@ -57,8 +57,8 @@ export function createStatsService({ hostService, pingRepository, config, now = 
       const { since, count, bucketMs } = windowFor(now(), period.hours, period.bucketMinutes)
 
       const [summary, rows] = await Promise.all([
-        pingRepository.summarySince(hostId, since),
-        pingRepository.bucketsSince({ hostId, since, bucketMinutes: period.bucketMinutes }),
+        recordRepository.summarySince(hostId, since),
+        recordRepository.bucketsSince({ hostId, since, bucketMinutes: period.bucketMinutes }),
       ])
 
       return {
@@ -79,7 +79,7 @@ export function createStatsService({ hostService, pingRepository, config, now = 
     /** Tendencia de latencia de toda la red (últimas 2 horas, franjas de 5 minutos). */
     async overview() {
       const { since, count, bucketMs } = windowFor(now(), 2, 5)
-      const rows = await pingRepository.bucketsSince({ since, bucketMinutes: 5 })
+      const rows = await recordRepository.bucketsSince({ since, bucketMinutes: 5 })
       return {
         intervalSeconds: Math.round(config.intervalMs / 1000),
         degradedLatencyMs: config.degradedLatencyMs,

@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { parsePingOutput } from '../../src/monitoring/ping-parser.js'
-import { pingArgs } from '../../src/monitoring/ping-probe.js'
+import { parsePingOutput, pingArgs } from '../../../src/monitoring/checks/ping.js'
 
 const WINDOWS_ES = `
 Haciendo ping a 8.8.8.8 con 32 bytes de datos:

@@ -82,7 +82,7 @@ describe('API de estadísticas', () => {
     const now = Date.now()
     // 3 respuestas (10, 20, 30 ms) y 1 fallo en la última hora
     for (const [minutesAgo, reachable, latencyMs] of [[50, true, 10], [40, true, 20], [30, true, 30], [20, false, null]]) {
-      ctx.pingRepository.records.push({
+      ctx.recordRepository.records.push({
         hostId: host.id, reachable, latencyMs, packetLossPct: reachable ? 0 : 100, checkedAt: new Date(now - minutesAgo * 60_000),
       })
     }

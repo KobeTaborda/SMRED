@@ -87,7 +87,7 @@ export function createFakeHostRepository() {
   }
 }
 
-export function createFakePingRepository() {
+export function createFakeRecordRepository() {
   const records = []
   const toRecord = (r) => ({ checkedAt: r.checkedAt.toISOString(), reachable: r.reachable, latencyMs: r.latencyMs, packetLossPct: r.packetLossPct })
   const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)

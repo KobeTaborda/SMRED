@@ -6,13 +6,13 @@ import cron from 'node-cron'
  *   nunca empiece antes de que termine el anterior, aunque la red esté lenta.
  * - Limpieza diaria de historial viejo y sesiones vencidas.
  */
-export function startScheduler({ pingMonitor, sessionStore, loginAttempts, config, logger }) {
+export function startScheduler({ monitor, sessionStore, loginAttempts, config, logger }) {
   let stopped = false
   let timer
 
   const runPingCycle = async () => {
     try {
-      await pingMonitor.checkAll()
+      await monitor.checkAll()
     } catch (err) {
       logger.error({ err }, 'Error en el ciclo de ping')
     } finally {
@@ -23,7 +23,7 @@ export function startScheduler({ pingMonitor, sessionStore, loginAttempts, confi
 
   const cleanupTask = cron.schedule(config.cleanupCron, async () => {
     try {
-      const pings = await pingMonitor.purgeOld()
+      const pings = await monitor.purgeOld()
       const sessions = await sessionStore.clearExpired()
       const attempts = loginAttempts ? await loginAttempts.purgeStale() : 0
       logger.info({ pings, sessions, attempts }, 'Limpieza diaria completada')

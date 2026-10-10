@@ -1,7 +1,7 @@
 import { toIso } from '../common/mappers.js'
 
 /** @param {import('knex').Knex} db */
-export function createPingRepository(db) {
+export function createCheckRecordRepository(db) {
   const table = () => db('ping_records')
 
   const toRecord = (row) => ({

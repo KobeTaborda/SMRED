@@ -4,10 +4,10 @@ import pino from 'pino'
 import { createApp } from '../../src/app.js'
 import { createMemoryAttemptRepository, LoginAttempts } from '../../src/auth/login-attempts.js'
 import { createHostService } from '../../src/hosts/host.service.js'
-import { createPingMonitor } from '../../src/monitoring/ping-monitor.service.js'
+import { createMonitor } from '../../src/monitoring/monitor.service.js'
 import { createStatsService } from '../../src/monitoring/stats.js'
 import { createUserService } from '../../src/users/user.service.js'
-import { createFakeHostRepository, createFakePingRepository, createFakeProbe, createFakeUserRepository } from './fakes.js'
+import { createFakeHostRepository, createFakeRecordRepository, createFakeProbe, createFakeUserRepository } from './fakes.js'
 import { EventEmitter } from 'node:events'
 
 export const ADMIN = { username: 'admin', password: 'Admin-Password-1', fullName: 'Admin', role: 'ADMIN' }
@@ -28,10 +28,10 @@ export async function createTestApp() {
   const userService = createUserService(userRepository, { bcryptRounds: 4, logger })
   const events = new EventEmitter()
   const hostService = createHostService(createFakeHostRepository(), { logger, events })
-  const pingRepository = createFakePingRepository()
+  const recordRepository = createFakeRecordRepository()
   const probe = createFakeProbe()
-  const pingMonitor = createPingMonitor({ hostService, pingRepository, probe, config: config.monitoring, logger })
-  const statsService = createStatsService({ hostService, pingRepository, config: config.monitoring })
+  const monitor = createMonitor({ hostService, recordRepository, probe, config: config.monitoring, logger })
+  const statsService = createStatsService({ hostService, recordRepository, config: config.monitoring })
   const loginAttempts = new LoginAttempts({
     repository: createMemoryAttemptRepository(),
     maxAttempts: 4,
@@ -45,10 +45,10 @@ export async function createTestApp() {
   await userService.create(VIEWER, { mustChangePassword: false })
 
   const app = createApp({
-    config, logger, userRepository, userService, hostService, pingMonitor, statsService, loginAttempts,
+    config, logger, userRepository, userService, hostService, monitor, statsService, loginAttempts,
     sessionStore: new session.MemoryStore(),
   })
-  return { app, userService, userRepository, probe, pingRepository, events }
+  return { app, userService, userRepository, probe, recordRepository, events }
 }
 
 /**

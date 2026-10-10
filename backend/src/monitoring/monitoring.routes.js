@@ -3,7 +3,7 @@ import { notFound } from '../common/errors.js'
 import { parseId } from '../common/validate.js'
 
 /** Rutas bajo /api/hosts/:id. POST /check es solo ADMIN (regla de escritura en app.js). */
-export function createMonitoringRouter(pingMonitor, statsService) {
+export function createMonitoringRouter(monitor, statsService) {
   const router = Router({ mergeParams: true })
 
   router.param('id', (req, _res, next, value) => {
@@ -13,15 +13,15 @@ export function createMonitoringRouter(pingMonitor, statsService) {
   })
 
   router.post('/:id/check', async (req, res) => {
-    res.json(await pingMonitor.checkNow(req.hostId))
+    res.json(await monitor.checkNow(req.hostId))
   })
 
   /** ?limit=N devuelve las últimas N; si no, las de las últimas ?hours=24 horas. */
   router.get('/:id/pings', async (req, res) => {
     if (req.query.limit) {
-      return res.json(await pingMonitor.latest(req.hostId, Number(req.query.limit)))
+      return res.json(await monitor.latest(req.hostId, Number(req.query.limit)))
     }
-    res.json(await pingMonitor.history(req.hostId, Number(req.query.hours ?? 24)))
+    res.json(await monitor.history(req.hostId, Number(req.query.hours ?? 24)))
   })
 
   router.get('/:id/stats', async (req, res) => {

@@ -9,9 +9,9 @@ import { createLogger } from './config/logger.js'
 import { createDb } from './db/knex.js'
 import { createHostRepository } from './hosts/host.repository.js'
 import { createHostService } from './hosts/host.service.js'
-import { createPingMonitor } from './monitoring/ping-monitor.service.js'
-import { createPingProbe } from './monitoring/ping-probe.js'
-import { createPingRepository } from './monitoring/ping.repository.js'
+import { createMonitor } from './monitoring/monitor.service.js'
+import { createPingProbe } from './monitoring/checks/ping.js'
+import { createCheckRecordRepository } from './monitoring/check-records.repository.js'
 import { createStatsService } from './monitoring/stats.js'
 import { startScheduler } from './monitoring/scheduler.js'
 import { seedInitialAdmin } from './users/admin-seeder.js'
@@ -47,11 +47,11 @@ async function main() {
   const userRepository = createUserRepository(db)
   const userService = createUserService(userRepository, { bcryptRounds: config.security.bcryptRounds, logger })
   const hostService = createHostService(createHostRepository(db), { logger })
-  const pingRepository = createPingRepository(db)
-  const statsService = createStatsService({ hostService, pingRepository, config: config.monitoring })
-  const pingMonitor = createPingMonitor({
+  const recordRepository = createCheckRecordRepository(db)
+  const statsService = createStatsService({ hostService, recordRepository, config: config.monitoring })
+  const monitor = createMonitor({
     hostService,
-    pingRepository,
+    recordRepository,
     probe: createPingProbe(),
     config: config.monitoring,
     logger,
@@ -67,7 +67,7 @@ async function main() {
 
   await seedInitialAdmin({ userService, seedAdmin: config.seedAdmin, logger })
 
-  const app = createApp({ config, logger, userRepository, userService, hostService, pingMonitor, statsService, loginAttempts, sessionStore })
+  const app = createApp({ config, logger, userRepository, userService, hostService, monitor, statsService, loginAttempts, sessionStore })
   const onListen = (protocol) => () => logger.info(`API escuchando en ${protocol}://localhost:${config.port}`)
   let server
   if (config.https.enabled) {
@@ -77,7 +77,7 @@ async function main() {
     logger.warn('Sin certificado en certs/: la API usa HTTP. Para activar HTTPS ejecuta scripts/generar-certificado.ps1')
     server = app.listen(config.port, onListen('http'))
   }
-  const scheduler = startScheduler({ pingMonitor, sessionStore, loginAttempts, config: config.monitoring, logger })
+  const scheduler = startScheduler({ monitor, sessionStore, loginAttempts, config: config.monitoring, logger })
 
   // Apagado ordenado: termina las peticiones en curso y cierra las conexiones a la BD
   const shutdown = async (signal) => {
