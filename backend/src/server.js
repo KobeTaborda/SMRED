@@ -14,6 +14,7 @@ import { createCheckRecordRepository } from './monitoring/check-records.reposito
 import { createCheckRunner } from './monitoring/checks/index.js'
 import { createStatsService } from './monitoring/stats.js'
 import { startScheduler } from './monitoring/scheduler.js'
+import { seedDemoData } from './demo/demo-seeder.js'
 import { seedInitialAdmin } from './users/admin-seeder.js'
 import { createUserRepository } from './users/user.repository.js'
 import { createUserService } from './users/user.service.js'
@@ -65,7 +66,9 @@ async function main() {
     resetAfterMs: config.security.lockResetAfterMs,
   })
 
+  // El orden importa: el administrador inicial solo se crea si la tabla de usuarios está vacía
   await seedInitialAdmin({ userService, seedAdmin: config.seedAdmin, logger })
+  await seedDemoData({ userService, hostService, isProduction: config.isProduction, logger })
 
   const app = createApp({
     config, logger, userRepository, userService, hostService, monitor, statsService, loginAttempts, sessionStore,
