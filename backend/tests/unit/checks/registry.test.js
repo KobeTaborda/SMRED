@@ -8,7 +8,7 @@ describe('Registro de revisiones', () => {
   it('SNMP y Agente están registrados como próximamente y no se ejecutan', () => {
     assert.equal(getCheck('SNMP').available, false)
     assert.equal(getCheck('AGENT').available, false)
-    assert.deepEqual(CHECK_TYPES, ['PING', 'TCP', 'HTTP'])
+    assert.deepEqual(CHECK_TYPES, ['PING', 'TCP', 'HTTP', 'DNS'])
   })
 
   it('cada revisión disponible define lo necesario para validarse y ejecutarse', () => {
@@ -46,14 +46,15 @@ describe('createCheckRunner', () => {
   const fake = (type, result = { reachable: true, avgLatencyMs: 1, packetLossPct: 0 }) => ({
     run: async (host, config) => (calls.push([type, host, config]), result),
   })
-  const runner = createCheckRunner({ runners: { PING: fake('PING'), TCP: fake('TCP'), HTTP: fake('HTTP') } })
+  const runner = createCheckRunner({ runners: { PING: fake('PING'), TCP: fake('TCP'), HTTP: fake('HTTP'), DNS: fake('DNS') } })
   const config = { attempts: 3, timeoutMs: 2000, httpTimeoutMs: 10_000 }
 
   it('ejecuta la revisión que corresponde a cada host', async () => {
     await runner.check({ checkType: 'TCP', address: '10.0.0.5', port: 3389 }, config)
     await runner.check({ checkType: 'HTTP', address: 'https://tdea.edu.co/' }, config)
+    await runner.check({ checkType: 'DNS', address: 'tdea.edu.co' }, config)
     await runner.check({ address: '8.8.8.8' }, config) // sin tipo = ping
-    assert.deepEqual(calls.map((c) => c[0]), ['TCP', 'HTTP', 'PING'])
+    assert.deepEqual(calls.map((c) => c[0]), ['TCP', 'HTTP', 'DNS', 'PING'])
   })
 
   it('no ejecuta revisiones próximas', () => {

@@ -63,8 +63,23 @@ function HttpFields({ form, errors, update }) {
   )
 }
 
+/** @param {FieldsProps} props */
+function DnsFields({ form, errors, update }) {
+  return (
+    <TextField
+      label="IP esperada"
+      placeholder="Ej. 200.12.180.5"
+      hint="Opcional. Avisa si el dominio empieza a apuntar a otra IP."
+      className="font-mono"
+      value={form.expectedIp}
+      error={errors.expectedIp}
+      onChange={(e) => update('expectedIp', e.target.value)}
+    />
+  )
+}
+
 /** @type {Partial<Record<import('../types').CheckType, (props: FieldsProps) => import('react').ReactNode>>} */
-const FIELDS = { TCP: TcpFields, HTTP: HttpFields }
+const FIELDS = { TCP: TcpFields, HTTP: HttpFields, DNS: DnsFields }
 
 /** Campos del tipo de revisión elegido (nada si el tipo no tiene campos propios). @param {FieldsProps & { checkType: string }} props */
 export function CheckFields({ checkType, ...props }) {

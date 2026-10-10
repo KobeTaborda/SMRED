@@ -169,10 +169,11 @@ Al agregar un equipo, el campo **Qué revisar** define la prueba:
 | Ping | Que el equipo responda en la red | Latencia, paquetes perdidos y variación (jitter) |
 | Puerto | Que un servicio acepte conexiones (ej. 3389, 22, 1433, 443) | Tiempo de conexión, o por qué falló (puerto cerrado, sin ruta...) |
 | Página web | Que una URL `http://` o `https://` responda con el código esperado y, si se indica, contenga un texto | Código HTTP, tiempo por fase (DNS, conexión, TLS, servidor, descarga) y días para que venza el certificado SSL |
+| DNS | Que un dominio resuelva y, si se indica, a la IP esperada | IPs a las que apunta y tiempo de respuesta del DNS |
 | SNMP | *Próximamente:* tráfico y estado de routers y switches | — |
 | Agente en el equipo | *Próximamente:* CPU, memoria y disco de los servidores | — |
 
-Cada equipo puede tener su propio umbral de "lento"; si se deja vacío usa el general (`PING_DEGRADED_MS` para ping y puerto; `HTTP_DEGRADED_MS` para páginas web). Un mismo equipo se puede agregar varias veces con revisiones distintas (por ejemplo, ping y puerto 3389).
+Cada equipo puede tener su propio umbral de "lento"; si se deja vacío usa el general (`PING_DEGRADED_MS` para ping, puerto y DNS; `HTTP_DEGRADED_MS` para páginas web). Un mismo equipo se puede agregar varias veces con revisiones distintas (por ejemplo, ping y puerto 3389).
 
 ## 9. Rutina diaria
 
@@ -278,7 +279,7 @@ backend/src/
 ├── users/           cuentas de usuario (pantalla Usuarios) y administrador inicial
 ├── hosts/           equipos: datos, validación y guardado en la base
 ├── monitoring/
-│   ├── checks/      un archivo por tipo de revisión (ping, tcp, http, snmp, agent)
+│   ├── checks/      un archivo por tipo de revisión (ping, tcp, http, dns, snmp, agent)
 │   │   └── index.js   lista de tipos de revisión
 │   ├── monitor.service.js         ciclo de revisiones de todos los equipos
 │   ├── status-evaluator.js        reglas de estado: en línea, lento, sin respuesta

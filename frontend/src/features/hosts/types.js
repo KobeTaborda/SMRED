@@ -1,7 +1,7 @@
 /**
  * @typedef {'UNKNOWN' | 'UP' | 'DEGRADED' | 'DOWN'} HostStatus
  * @typedef {'SERVER' | 'ROUTER' | 'SWITCH' | 'FIREWALL' | 'WORKSTATION' | 'WEBSITE' | 'OTHER'} HostType
- * @typedef {'PING' | 'TCP' | 'HTTP' | 'SNMP' | 'AGENT'} CheckType SNMP y AGENT: próximamente
+ * @typedef {'PING' | 'TCP' | 'HTTP' | 'DNS' | 'SNMP' | 'AGENT'} CheckType SNMP y AGENT: próximamente
  *
  * @typedef {object} Host
  * @property {number} id

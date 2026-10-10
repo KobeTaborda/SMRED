@@ -17,6 +17,9 @@ export function isValidHostAddress(value) {
   return HOSTNAME.test(value)
 }
 
+/** Un nombre de dominio, no una IP (para la revisión DNS). @param {string} value */
+export const isValidDomainName = (value) => isValidHostAddress(value) && isIP(value) === 0
+
 /**
  * URL de una página para la revisión HTTP: solo http/https, con un host válido y sin
  * usuario ni contraseña incrustados (no se guardan credenciales en la base).

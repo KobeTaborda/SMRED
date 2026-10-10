@@ -42,6 +42,14 @@ export const CHECK_TYPES = {
       ...(host.keyword ? [['Texto esperado', `"${host.keyword}"`]] : []),
     ],
   },
+  DNS: {
+    label: 'Que un dominio resuelva (DNS)',
+    short: 'DNS',
+    available: true,
+    addressLabel: 'Nombre de dominio',
+    placeholder: 'Ej. tdea.edu.co',
+    detailRows: (host) => (host.expectedIp ? [['IP esperada', <span key="ip" className="font-mono">{host.expectedIp}</span>]] : []),
+  },
   SNMP: {
     label: 'Tráfico y estado de un equipo de red (SNMP, próximamente)',
     short: 'SNMP',
@@ -54,7 +62,7 @@ export const CHECK_TYPES = {
   },
 }
 
-/** Resumen corto de la revisión: "Ping", "Puerto 3389", "Web". @param {import('../types').Host} host */
+/** Resumen corto de la revisión: "Ping", "Puerto 3389", "Web", "DNS". @param {import('../types').Host} host */
 export const checkSummary = (host) =>
   host.checkType === 'TCP' ? `Puerto ${host.port}` : CHECK_TYPES[host.checkType ?? 'PING'].short
 
