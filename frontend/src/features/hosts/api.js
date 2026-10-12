@@ -44,13 +44,15 @@ export function useLatestPings(id, limit = 6) {
     /** @returns {Promise<import('./types').PingRecord[]>} */
     queryFn: () => api(`/hosts/${id}/pings?limit=${limit}`),
     refetchInterval: REFRESH_MS,
+    // Al pedir más revisiones se siguen mostrando las que ya había mientras llegan las nuevas
+    placeholderData: (previous) => previous,
   })
 }
 
 export function useOverview() {
   return useQuery({
     queryKey: ['overview'],
-    /** @returns {Promise<{ intervalSeconds: number, degradedLatencyMs: number, latencyTrend: { start: string, avgLatencyMs: number | null }[] }>} */
+    /** @returns {Promise<{ intervalSeconds: number, degradedLatencyMs: number, httpDegradedLatencyMs: number, latencyTrend: { start: string, avgLatencyMs: number | null }[] }>} */
     queryFn: () => api('/overview'),
     refetchInterval: 60_000,
   })
@@ -83,8 +85,15 @@ export function useDeleteHost() {
 export function useCheckHost() {
   const invalidate = useInvalidateHosts()
   return useMutation({
-    /** @param {number} id @returns {Promise<{ status: import('./types').HostStatus, latencyMs: number | null }>} */
+    /** @param {number} id @returns {Promise<{ status: import('./types').HostStatus, latencyMs: number | null, message: string | null }>} */
     mutationFn: (id) => api(`/hosts/${id}/check`, { method: 'POST' }),
     onSuccess: invalidate,
+  })
+}
+
+export function useTraceroute() {
+  return useMutation({
+    /** @param {number} id @returns {Promise<import('./types').TracerouteResult>} */
+    mutationFn: (id) => api(`/hosts/${id}/traceroute`, { method: 'POST' }),
   })
 }

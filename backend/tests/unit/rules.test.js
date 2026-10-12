@@ -2,13 +2,28 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { createMemoryAttemptRepository, LoginAttempts } from '../../src/auth/login-attempts.js'
 import { isValidHostAddress } from '../../src/hosts/host-address.js'
-import { evaluateStatus } from '../../src/monitoring/status-evaluator.js'
+import { certificateDaysLeft, checkWarnings, degradedThresholdFor, evaluateStatus } from '../../src/monitoring/status-evaluator.js'
 
 describe('evaluateStatus', () => {
   it('DOWN si no responde', () => assert.equal(evaluateStatus({ reachable: false, avgLatencyMs: null, packetLossPct: 100 }, 200), 'DOWN'))
   it('UP si responde rápido y sin pérdida', () => assert.equal(evaluateStatus({ reachable: true, avgLatencyMs: 12, packetLossPct: 0 }, 200), 'UP'))
   it('DEGRADED si la latencia supera el umbral', () => assert.equal(evaluateStatus({ reachable: true, avgLatencyMs: 350, packetLossPct: 0 }, 200), 'DEGRADED'))
   it('DEGRADED si hay pérdida parcial', () => assert.equal(evaluateStatus({ reachable: true, avgLatencyMs: 20, packetLossPct: 33 }, 200), 'DEGRADED'))
+})
+
+describe('degradedThresholdFor', () => {
+  const config = { degradedLatencyMs: 200, httpDegradedLatencyMs: 1000 }
+  it('usa el valor propio del equipo si lo tiene', () => assert.equal(degradedThresholdFor({ checkType: 'PING', degradedMs: 50 }, config), 50))
+  it('las páginas web usan su umbral general', () => assert.equal(degradedThresholdFor({ checkType: 'HTTP', degradedMs: null }, config), 1000))
+  it('el resto usa el umbral del ping', () => assert.equal(degradedThresholdFor({ checkType: 'TCP', degradedMs: null }, config), 200))
+})
+
+describe('certificado SSL', () => {
+  const now = new Date('2026-10-03T12:00:00Z')
+  it('cuenta los días que faltan', () => assert.equal(certificateDaysLeft('2026-10-13T12:00:00Z', now), 10))
+  it('avisa si vence pronto', () => assert.deepEqual(checkWarnings({ sslExpiresAt: new Date('2026-10-08T12:00:00Z') }, { now }), ['El certificado SSL vence en 5 días.']))
+  it('no avisa si falta mucho', () => assert.deepEqual(checkWarnings({ sslExpiresAt: new Date('2027-01-01T00:00:00Z') }, { now }), []))
+  it('no avisa si no hay certificado', () => assert.deepEqual(checkWarnings({}, { now }), []))
 })
 
 describe('isValidHostAddress', () => {

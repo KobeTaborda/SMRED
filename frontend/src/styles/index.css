@@ -33,6 +33,7 @@
   --light-2: #4b3fa8;
   --light-3: #2f6f8f;
   --backdrop: rgba(8, 9, 16, 0.6);
+  --menu: #1d2033;
 }
 
 [data-theme='light'] {
@@ -62,6 +63,7 @@
   --light-2: #9184d9;
   --light-3: #bcd3f2;
   --backdrop: rgba(40, 36, 80, 0.35);
+  --menu: #ffffff;
 }
 
 @theme inline {
@@ -106,6 +108,16 @@
   dialog::backdrop {
     background: var(--backdrop);
     backdrop-filter: blur(4px);
+  }
+
+  /* La lista de un select usa el fondo del control; como ese fondo es translúcido, se le da uno sólido */
+  option {
+    background-color: var(--menu);
+    color: var(--text);
+  }
+
+  option:disabled {
+    color: var(--muted);
   }
 }
 

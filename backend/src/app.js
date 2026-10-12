@@ -17,7 +17,7 @@ export const SESSION_COOKIE = 'smred.sid'
  * Construye la aplicación Express. Recibe todas sus dependencias (inyección de dependencias),
  * así los tests pueden usar repositorios en memoria sin necesitar SQL Server.
  */
-export function createApp({ config, logger, userRepository, userService, hostService, pingMonitor, statsService, loginAttempts, sessionStore }) {
+export function createApp({ config, logger, userRepository, userService, hostService, monitor, statsService, tracerouteService, loginAttempts, sessionStore }) {
   const app = express()
   app.disable('x-powered-by')
   // En producción, detrás del proxy HTTPS de la nube. En desarrollo, detrás del proxy de Vite (en este mismo equipo):
@@ -65,7 +65,7 @@ export function createApp({ config, logger, userRepository, userService, hostSer
   api.use(requirePasswordChangeFirst)
   api.use('/auth', createAuthRouter({ userService, loginAttempts, sessionCookieName: SESSION_COOKIE }))
   api.use('/users', requireAdmin, createUserRouter(userService, loginAttempts))
-  api.use('/hosts', requireAdminForWrites, createHostRouter(hostService), createMonitoringRouter(pingMonitor, statsService))
+  api.use('/hosts', requireAdminForWrites, createHostRouter(hostService), createMonitoringRouter(monitor, statsService, tracerouteService))
   api.use('/overview', requireAuth, createOverviewRouter(statsService))
   api.use(apiNotFound)
   app.use('/api', api)

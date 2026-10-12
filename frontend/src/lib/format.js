@@ -7,9 +7,9 @@ const dayTime = new Intl.DateTimeFormat('es-CO', { weekday: 'short', hour: '2-di
 
 export function formatLatency(ms) {
   if (ms == null) return '—'
-  // Decimales solo cuando aportan: 0.4 ms y 2.5 ms, pero 2 ms (no 2.0) y 245 ms
+  // Decimales solo cuando aportan: 0,4 ms y 2,5 ms, pero 2 ms (no 2,0) y 245 ms. Coma decimal, como en los porcentajes
   if (ms >= 10 || Number.isInteger(ms)) return `${Math.round(ms)} ms`
-  return `${ms.toFixed(1)} ms`
+  return `${ms.toFixed(1).replace('.', ',')} ms`
 }
 
 export function formatRelative(iso) {

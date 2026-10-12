@@ -64,32 +64,41 @@ export function createFakeHostRepository() {
     async findMonitored() {
       return [...rows.values()].filter((h) => h.monitoringEnabled).map(clone)
     },
-    async existsByAddress(address, excludeId) {
-      return [...rows.values()].some((h) => h.address.toLowerCase() === address.toLowerCase() && h.id !== excludeId)
+    async existsByTarget({ checkType = 'PING', address, port = null }, excludeId) {
+      return [...rows.values()].some(
+        (h) => h.checkType === checkType && h.address.toLowerCase() === address.toLowerCase() && (h.port ?? null) === port && h.id !== excludeId,
+      )
     },
     async insert(data) {
       const host = {
-        id: nextId++, ...data, status: 'UNKNOWN', lastLatencyMs: null, lastCheckedAt: null, lastSeenAt: null, statusChangedAt: null, createdAt: new Date(),
+        id: nextId++, checkType: 'PING', port: null, expectedStatus: null, keyword: null, expectedIp: null, degradedMs: null, ...data,
+        status: 'UNKNOWN', lastLatencyMs: null, lastMessage: null, sslExpiresAt: null, lastCheckedAt: null, lastSeenAt: null, statusChangedAt: null, createdAt: new Date(),
       }
       rows.set(host.id, host)
       return clone(host)
     },
-    async update(id, data) {
+    async update(id, data, { resetCheck = false } = {}) {
       Object.assign(rows.get(id), data)
+      if (resetCheck) Object.assign(rows.get(id), { status: 'UNKNOWN', lastLatencyMs: null, lastMessage: null, sslExpiresAt: null, statusChangedAt: null })
       return clone(rows.get(id))
     },
     async delete(id) {
       rows.delete(id)
     },
-    async updateCheckResult(id, { status, latencyMs, checkedAt, seenAt, statusChangedAt }) {
-      Object.assign(rows.get(id), { status, lastLatencyMs: latencyMs, lastCheckedAt: checkedAt, lastSeenAt: seenAt, statusChangedAt })
+    async updateCheckResult(id, { status, latencyMs, message, sslExpiresAt, checkedAt, seenAt, statusChangedAt }) {
+      Object.assign(rows.get(id), {
+        status, lastLatencyMs: latencyMs, lastMessage: message, sslExpiresAt, lastCheckedAt: checkedAt, lastSeenAt: seenAt, statusChangedAt,
+      })
     },
   }
 }
 
-export function createFakePingRepository() {
+export function createFakeRecordRepository() {
   const records = []
-  const toRecord = (r) => ({ checkedAt: r.checkedAt.toISOString(), reachable: r.reachable, latencyMs: r.latencyMs, packetLossPct: r.packetLossPct })
+  const toRecord = (r) => ({
+    checkedAt: r.checkedAt.toISOString(), reachable: r.reachable, latencyMs: r.latencyMs, packetLossPct: r.packetLossPct,
+    jitterMs: r.jitterMs ?? null, timings: r.timings ?? null, statusCode: r.statusCode ?? null, message: r.message ?? null,
+  })
   const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
   return {
     records,
@@ -106,13 +115,14 @@ export function createFakePingRepository() {
         avgLatencyMs: avg(lat.map((r) => r.latencyMs)),
         maxLatencyMs: lat.length ? Math.max(...lat.map((r) => r.latencyMs)) : null,
         avgLossPct: avg(rs.map((r) => r.packetLossPct)),
+        avgJitterMs: avg(rs.filter((r) => r.jitterMs != null).map((r) => r.jitterMs)),
         maxLatencyAt: slowest ? slowest.checkedAt.toISOString() : null,
       }
     },
-    async bucketsSince({ hostId, since, bucketMinutes }) {
+    async bucketsSince({ hostId, hostIds, since, bucketMinutes }) {
       const groups = new Map()
       for (const r of records) {
-        if (r.checkedAt < since || (hostId && r.hostId !== hostId)) continue
+        if (r.checkedAt < since || (hostId && r.hostId !== hostId) || (hostIds && !hostIds.includes(r.hostId))) continue
         const bucket = Math.floor((r.checkedAt - since) / 60000 / bucketMinutes)
         if (!groups.has(bucket)) groups.set(bucket, [])
         groups.get(bucket).push(r)
@@ -138,15 +148,27 @@ export function createFakePingRepository() {
   }
 }
 
-/** Sonda de ping falsa: responde lo que el test configure por dirección. */
-export function createFakeProbe(defaultResult = { reachable: true, avgLatencyMs: 12, packetLossPct: 0 }) {
+/** Sonda falsa para cualquier tipo de revisión: responde lo que se le configure por dirección. */
+export function createFakeCheckRunner(defaultResult = { reachable: true, avgLatencyMs: 12, packetLossPct: 0 }) {
   const results = new Map()
   return {
     set(address, result) {
       results.set(address, result)
     },
-    async ping(address) {
-      return results.get(address) ?? defaultResult
+    async check(host) {
+      return results.get(host.address) ?? defaultResult
+    },
+  }
+}
+
+/** Traceroute falso: devuelve una salida fija sin ejecutar ningún comando. */
+export function createFakeTracerouteRunner(output = '  1    <1 ms    <1 ms    <1 ms  192.168.1.1\n  2    12 ms    11 ms    13 ms  8.8.8.8\n') {
+  const calls = []
+  return {
+    calls,
+    async run(target) {
+      calls.push(target)
+      return output
     },
   }
 }

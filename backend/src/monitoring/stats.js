@@ -1,6 +1,8 @@
+import { degradedThresholdFor } from './status-evaluator.js'
+
 /**
  * Estadísticas para la vista de detalle y el panel de inicio.
- * La agregación pesada la hace SQL Server (ping.repository); aquí solo se arman las series.
+ * La agregación pesada la hace SQL Server (check-records.repository); aquí solo se arman las series.
  */
 
 export const PERIODS = {
@@ -49,21 +51,23 @@ export function fillBuckets(rows, { since, count, bucketMs, degradedLatencyMs })
   })
 }
 
-export function createStatsService({ hostService, pingRepository, config, now = () => new Date() }) {
+export function createStatsService({ hostService, recordRepository, config, now = () => new Date() }) {
   return {
     async hostStats(hostId, periodKey) {
-      await hostService.get(hostId) // 404 si no existe
+      const host = await hostService.get(hostId) // 404 si no existe
+      const threshold = degradedThresholdFor(host, config)
       const period = PERIODS[periodKey] ?? PERIODS['24h']
       const { since, count, bucketMs } = windowFor(now(), period.hours, period.bucketMinutes)
 
       const [summary, rows] = await Promise.all([
-        pingRepository.summarySince(hostId, since),
-        pingRepository.bucketsSince({ hostId, since, bucketMinutes: period.bucketMinutes }),
+        recordRepository.summarySince(hostId, since),
+        recordRepository.bucketsSince({ hostId, since, bucketMinutes: period.bucketMinutes }),
       ])
 
       return {
         period: PERIODS[periodKey] ? periodKey : '24h',
-        degradedLatencyMs: config.degradedLatencyMs,
+        degradedLatencyMs: threshold,
+        sslWarningDays: config.sslWarningDays ?? 14,
         summary: {
           checks: summary.checks,
           availabilityPct: summary.checks ? round1((summary.ok / summary.checks) * 100) : null,
@@ -71,18 +75,21 @@ export function createStatsService({ hostService, pingRepository, config, now = 
           maxLatencyMs: round1(summary.maxLatencyMs),
           maxLatencyAt: summary.maxLatencyAt,
           packetLossPct: round1(summary.avgLossPct),
+          avgJitterMs: round1(summary.avgJitterMs ?? null),
         },
-        buckets: fillBuckets(rows, { since, count, bucketMs, degradedLatencyMs: config.degradedLatencyMs }),
+        buckets: fillBuckets(rows, { since, count, bucketMs, degradedLatencyMs: threshold }),
       }
     },
 
-    /** Tendencia de latencia de toda la red (últimas 2 horas, franjas de 5 minutos). */
+    /** Tendencia de latencia de la red (2 horas, franjas de 5 min). Solo pings, para no mezclar con páginas web. */
     async overview() {
       const { since, count, bucketMs } = windowFor(now(), 2, 5)
-      const rows = await pingRepository.bucketsSince({ since, bucketMinutes: 5 })
+      const pingHostIds = (await hostService.list()).filter((h) => (h.checkType ?? 'PING') === 'PING').map((h) => h.id)
+      const rows = await recordRepository.bucketsSince({ hostIds: pingHostIds, since, bucketMinutes: 5 })
       return {
         intervalSeconds: Math.round(config.intervalMs / 1000),
         degradedLatencyMs: config.degradedLatencyMs,
+        httpDegradedLatencyMs: config.httpDegradedLatencyMs ?? 1000,
         latencyTrend: fillBuckets(rows, { since, count, bucketMs, degradedLatencyMs: config.degradedLatencyMs }).map(
           ({ start, avgLatencyMs }) => ({ start, avgLatencyMs }),
         ),

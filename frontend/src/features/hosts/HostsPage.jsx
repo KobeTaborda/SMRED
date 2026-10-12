@@ -11,6 +11,7 @@ import { errorMessage } from '@/lib/api'
 import { formatLatency, formatRelative } from '@/lib/format'
 import { useHosts } from './api'
 import { HostForm } from './HostForm'
+import { checkSummary } from './checks/check-types'
 import { HOST_TYPE_LABELS } from './types'
 import { useHostActions } from './useHostActions'
 
@@ -24,6 +25,16 @@ const FILTERS = [
 const COLUMNS = 'grid-cols-[1.1fr_1.7fr_1.1fr_1fr_0.7fr_0.9fr_140px]'
 
 /** @typedef {{ mode: 'create' } | { mode: 'edit', host: import('./types').Host } | null} Editing */
+
+/**
+ * Bajo el nombre: el motivo si el equipo tiene problemas, si no, su ubicación.
+ * @param {import('./types').Host} host
+ */
+function secondLine(host) {
+  if (!host.monitoringEnabled) return 'Revisión automática pausada'
+  if ((host.status === 'DOWN' || host.status === 'DEGRADED') && host.lastMessage) return host.lastMessage
+  return host.location || '—'
+}
 
 export function HostsPage() {
   const isAdmin = useIsAdmin()
@@ -49,7 +60,7 @@ export function HostsPage() {
     <>
       <PageHeader
         title="Equipos"
-        description="Computadores, impresoras, routers y servidores que SMRED revisa automáticamente."
+        description="Computadores, impresoras, routers, servidores y sitios web que SMRED revisa automáticamente."
         actions={
           isAdmin && (
             <Button variant="glass" icon={<PlusIcon />} onClick={() => setEditing({ mode: 'create' })}>
@@ -116,11 +127,16 @@ export function HostsPage() {
                     <Link to={`/hosts/${host.id}`} className="truncate text-[15px] font-semibold text-ink hover:underline">
                       {host.name}
                     </Link>
-                    <span className="truncate text-[13px] text-muted">
-                      {host.monitoringEnabled ? host.location || '—' : 'Revisión automática pausada'}
+                    <span className="truncate text-[13px] text-muted" title={secondLine(host)}>
+                      {secondLine(host)}
                     </span>
                   </div>
-                  <span className="truncate font-mono text-sm">{host.address}</span>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate font-mono text-sm" title={host.address}>
+                      {host.address}
+                    </span>
+                    <span className="text-[13px] text-muted">{checkSummary(host)}</span>
+                  </div>
                   <span className="text-sm text-muted">{HOST_TYPE_LABELS[host.type]}</span>
                   <span className={`font-mono text-sm ${host.status === 'DEGRADED' ? 'text-warning' : ''}`}>{formatLatency(host.lastLatencyMs)}</span>
                   <span className="text-[13px] text-muted">{formatRelative(host.lastCheckedAt)}</span>

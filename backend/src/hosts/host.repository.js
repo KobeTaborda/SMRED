@@ -11,6 +11,12 @@ export function createHostRepository(db) {
     location: data.location,
     description: data.description,
     monitoring_enabled: data.monitoringEnabled,
+    check_type: data.checkType,
+    port: data.port,
+    expected_status: data.expectedStatus,
+    keyword: data.keyword,
+    expected_ip: data.expectedIp,
+    degraded_ms: data.degradedMs,
   })
 
   return {
@@ -26,8 +32,11 @@ export function createHostRepository(db) {
       return (await table().where({ monitoring_enabled: true }).select('*')).map(toHost)
     },
 
-    async existsByAddress(address, excludeId) {
-      const query = table().where({ address })
+    /** ¿Ya hay un host con la misma revisión (tipo + dirección + puerto)? */
+    async existsByTarget({ checkType, address, port }, excludeId) {
+      const query = table().where({ check_type: checkType, address })
+      if (port == null) query.whereNull('port')
+      else query.andWhere({ port })
       if (excludeId) query.whereNot({ id: excludeId })
       return Boolean(await query.first('id'))
     },
@@ -37,8 +46,11 @@ export function createHostRepository(db) {
       return this.findById(id)
     },
 
-    async update(id, data) {
-      await table().where({ id }).update({ ...toColumns(data), updated_at: new Date() })
+    async update(id, data, { resetCheck = false } = {}) {
+      const reset = resetCheck
+        ? { status: 'UNKNOWN', last_latency_ms: null, last_message: null, ssl_expires_at: null, status_changed_at: null }
+        : {}
+      await table().where({ id }).update({ ...toColumns(data), ...reset, updated_at: new Date() })
       return this.findById(id)
     },
 
@@ -50,10 +62,12 @@ export function createHostRepository(db) {
      * UPDATE puntual de los campos de estado. Solo toca estas columnas, así no pisa
      * cambios que un administrador esté haciendo en el mismo host al mismo tiempo.
      */
-    async updateCheckResult(id, { status, latencyMs, checkedAt, seenAt, statusChangedAt }) {
+    async updateCheckResult(id, { status, latencyMs, message, sslExpiresAt, checkedAt, seenAt, statusChangedAt }) {
       await table().where({ id }).update({
         status,
         last_latency_ms: latencyMs,
+        last_message: message,
+        ssl_expires_at: sslExpiresAt,
         last_checked_at: checkedAt,
         last_seen_at: seenAt,
         status_changed_at: statusChangedAt,

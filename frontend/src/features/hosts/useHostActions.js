@@ -22,7 +22,8 @@ export function useHostActions({ onDeleted } = {}) {
       onSuccess: (result) =>
         notify({
           title: `${host.name} revisado`,
-          description: result.status === 'DOWN' ? 'No respondió.' : `${STATUS_LABELS[result.status]}, responde en ${formatLatency(result.latencyMs)}.`,
+          description:
+            result.status === 'DOWN' ? (result.message ?? 'No respondió.') : `${STATUS_LABELS[result.status]}, responde en ${formatLatency(result.latencyMs)}.`,
           tone: result.status === 'DOWN' ? 'error' : 'success',
         }),
       onError: (error) => notify({ title: 'No se pudo revisar', description: errorMessage(error), tone: 'error' }),

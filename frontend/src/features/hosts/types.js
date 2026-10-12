@@ -1,6 +1,7 @@
 /**
  * @typedef {'UNKNOWN' | 'UP' | 'DEGRADED' | 'DOWN'} HostStatus
- * @typedef {'SERVER' | 'ROUTER' | 'SWITCH' | 'FIREWALL' | 'WORKSTATION' | 'OTHER'} HostType
+ * @typedef {'SERVER' | 'ROUTER' | 'SWITCH' | 'FIREWALL' | 'WORKSTATION' | 'WEBSITE' | 'OTHER'} HostType
+ * @typedef {'PING' | 'TCP' | 'HTTP' | 'DNS' | 'SNMP' | 'AGENT'} CheckType SNMP y AGENT: próximamente
  *
  * @typedef {object} Host
  * @property {number} id
@@ -10,8 +11,16 @@
  * @property {string | null} location
  * @property {string | null} description
  * @property {boolean} monitoringEnabled
+ * @property {CheckType} checkType
+ * @property {number | null} port
+ * @property {number | null} expectedStatus
+ * @property {string | null} keyword
+ * @property {string | null} expectedIp
+ * @property {number | null} degradedMs
  * @property {HostStatus} status
  * @property {number | null} lastLatencyMs
+ * @property {string | null} lastMessage
+ * @property {string | null} sslExpiresAt
  * @property {string | null} lastCheckedAt
  * @property {string | null} lastSeenAt
  * @property {string | null} statusChangedAt
@@ -24,6 +33,12 @@
  * @property {string} location
  * @property {string} description
  * @property {boolean} monitoringEnabled
+ * @property {CheckType} checkType
+ * @property {number | string | null} port
+ * @property {number | string | null} expectedStatus
+ * @property {string} keyword
+ * @property {string} expectedIp
+ * @property {number | string | null} degradedMs
  *
  * @typedef {object} Bucket
  * @property {string} start
@@ -35,16 +50,39 @@
  *
  * @typedef {object} HostStats
  * @property {'24h' | '7d'} period
- * @property {number} degradedLatencyMs
+ * @property {number} degradedLatencyMs umbral de "lento" de este equipo
+ * @property {number} sslWarningDays
  * @property {{ checks: number, availabilityPct: number | null, avgLatencyMs: number | null,
- *   maxLatencyMs: number | null, maxLatencyAt: string | null, packetLossPct: number | null }} summary
+ *   maxLatencyMs: number | null, maxLatencyAt: string | null, packetLossPct: number | null,
+ *   avgJitterMs: number | null }} summary
  * @property {Bucket[]} buckets
  *
- * @typedef {object} PingRecord
+ * @typedef {object} CheckTimings
+ * @property {number | null} dnsMs
+ * @property {number | null} connectMs
+ * @property {number | null} tlsMs
+ * @property {number | null} ttfbMs
+ *
+ * @typedef {object} PingRecord una revisión del historial (de cualquier tipo)
  * @property {string} checkedAt
  * @property {boolean} reachable
  * @property {number | null} latencyMs
  * @property {number} packetLossPct
+ * @property {number | null} jitterMs
+ * @property {CheckTimings | null} timings
+ * @property {number | null} statusCode
+ * @property {string | null} message
+ *
+ * @typedef {object} TracerouteHop
+ * @property {number} hop
+ * @property {string | null} address
+ * @property {number | null} latencyMs
+ * @property {number} lostProbes
+ *
+ * @typedef {object} TracerouteResult
+ * @property {string} target
+ * @property {TracerouteHop[]} hops
+ * @property {number} durationMs
  */
 
 /** @type {Record<HostType, string>} */
@@ -54,7 +92,16 @@ export const HOST_TYPE_LABELS = {
   SWITCH: 'Switch',
   FIREWALL: 'Firewall',
   WORKSTATION: 'Computador o impresora',
+  WEBSITE: 'Sitio web',
   OTHER: 'Otro',
+}
+
+// Los tipos de revisión (textos, campos, filas de detalle) están en checks/check-types.jsx
+
+/** Días que le quedan al certificado SSL (negativo si venció), o null. @param {string | null} expiresAt */
+export function certificateDaysLeft(expiresAt) {
+  if (!expiresAt) return null
+  return Math.floor((new Date(expiresAt).getTime() - Date.now()) / 86_400_000)
 }
 
 /** Palabras simples, entendibles sin saber de redes. @type {Record<HostStatus, string>} */

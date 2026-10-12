@@ -1,5 +1,5 @@
 import { formatDayTime, formatPercent, formatTime } from '@/lib/format'
-import { STATUS_LABELS } from './types'
+import { STATUS_LABELS } from '../types'
 
 const colors = {
   UP: 'bg-accent opacity-85',
