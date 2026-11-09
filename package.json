@@ -23,7 +23,7 @@
     "verify": "npm run lint && npm test"
   },
   "devDependencies": {
-    "concurrently": "^10.0.5",
+    "concurrently": "^10.0.6",
     "husky": "^9.1.7"
   }
 }
